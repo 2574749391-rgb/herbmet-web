@@ -1,4 +1,5 @@
 import hmac
+from datetime import date
 
 import streamlit as st
 from openai import APIConnectionError, APITimeoutError, AuthenticationError, BadRequestError, RateLimitError
@@ -11,6 +12,8 @@ st.set_page_config(
     page_icon="🌿",
     layout="wide",
 )
+
+PLATFORM_SESSION_LIMIT = 3
 
 
 def login_gate():
@@ -53,6 +56,30 @@ def login_gate():
 login_gate()
 
 
+def is_platform_account():
+    try:
+        return hmac.compare_digest(
+            st.session_state.get("username", ""),
+            str(st.secrets["auth"]["username"]),
+        )
+    except (KeyError, FileNotFoundError):
+        return False
+
+
+@st.cache_resource
+def platform_usage_store():
+    """数据库接入前的进程内临时计数器。"""
+    return {}
+
+
+def platform_usage_key():
+    return f"{date.today().isoformat()}:{st.session_state.get('username', '')}"
+
+
+def platform_runs_used():
+    return platform_usage_store().get(platform_usage_key(), 0)
+
+
 def display_papers(papers):
     for index, paper in enumerate(papers, start=1):
         st.markdown(f"**{index}. {paper['title']}**")
@@ -89,12 +116,16 @@ def show_model_error(error):
 st.title("🌿 HerbMet")
 st.subheader("中药材代谢研究助手")
 st.caption("检索真实文献，按成分整理吸收、分布、代谢与排泄证据。")
-st.info("公开体验版：请使用您自己的模型 API Key。Key 仅用于本次会话，不写入项目文件或研究记录。")
+platform_account = is_platform_account()
+if platform_account:
+    st.info("测试账号已接入平台模型，无需填写 API Key。当前临时限制为每日最多分析 3 次。")
+else:
+    st.info("请使用您自己的模型 API Key。Key 仅用于本次会话，不写入项目文件或研究记录。")
 
 with st.expander("第一次使用？查看三步说明"):
     st.markdown(
         """
-1. 打开左侧“模型设置”，选择服务商并填写自己的 API Key。
+1. 测试账号会自动使用平台模型；普通用户需在左侧填写自己的 API Key。
 2. 输入中药材中文名，点击“开始分析”。检索文献本身不消耗模型 Token。
 3. 报告生成后可查看入选文献，并下载 Markdown 报告。
 
@@ -104,22 +135,35 @@ with st.expander("第一次使用？查看三步说明"):
 
 with st.sidebar:
     st.header("模型设置")
-    provider = st.selectbox("服务商", ("阿里云百炼", "OpenAI 兼容接口（自定义）"))
-    base_url = st.text_input(
-        "Base URL",
-        value=(
-            "https://dashscope.aliyuncs.com/compatible-mode/v1"
-            if provider == "阿里云百炼"
-            else ""
-        ),
-    )
-    model = st.text_input(
-        "模型名称", value="qwen-plus" if provider == "阿里云百炼" else ""
-    )
-    api_key = st.text_input(
-        "API Key", type="password", placeholder="仅用于当前浏览器会话"
-    )
-    st.caption("请勿使用他人的 API Key。关闭或刷新页面后需要重新填写。")
+    if platform_account:
+        try:
+            api_key = str(st.secrets["platform_api"]["api_key"])
+            base_url = str(st.secrets["platform_api"]["base_url"])
+            model = str(st.secrets["platform_api"]["model"])
+        except (KeyError, FileNotFoundError):
+            st.error("管理员尚未完成平台 API 的 Secrets 配置。")
+            st.stop()
+        used_runs = platform_runs_used()
+        st.success(f"平台模型：{model}")
+        st.metric("本次登录剩余次数", max(0, PLATFORM_SESSION_LIMIT - used_runs))
+        st.caption("平台密钥保存在服务端，不会发送到浏览器输入框。")
+    else:
+        provider = st.selectbox("服务商", ("阿里云百炼", "OpenAI 兼容接口（自定义）"))
+        base_url = st.text_input(
+            "Base URL",
+            value=(
+                "https://dashscope.aliyuncs.com/compatible-mode/v1"
+                if provider == "阿里云百炼"
+                else ""
+            ),
+        )
+        model = st.text_input(
+            "模型名称", value="qwen-plus" if provider == "阿里云百炼" else ""
+        )
+        api_key = st.text_input(
+            "API Key", type="password", placeholder="仅用于当前浏览器会话"
+        )
+        st.caption("请勿使用他人的 API Key。关闭或刷新页面后需要重新填写。")
 
 with st.form("analysis_form"):
     herb = st.text_input(
@@ -137,6 +181,9 @@ if submitted:
 
     if not herb:
         st.warning("请输入中药材名称。")
+        st.stop()
+    if platform_account and platform_runs_used() >= PLATFORM_SESSION_LIMIT:
+        st.error("测试账号今天的 3 次平台分析额度已用完。请联系管理员，或使用普通账号和自己的 API Key。")
         st.stop()
     if not api_key or not base_url or not model:
         st.error("API Key、Base URL 和模型名称都必须填写。")
@@ -167,6 +214,10 @@ if submitted:
     col2.metric("ADME / 生物转化证据", len(adme_papers))
 
     try:
+        if platform_account:
+            usage = platform_usage_store()
+            key = platform_usage_key()
+            usage[key] = usage.get(key, 0) + 1
         with st.spinner("正在基于入选证据生成结构化报告…"):
             report = generate_report(
                 herb,
