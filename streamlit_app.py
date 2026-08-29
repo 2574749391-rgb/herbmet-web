@@ -1,3 +1,5 @@
+import hmac
+
 import streamlit as st
 from openai import APIConnectionError, APITimeoutError, AuthenticationError, BadRequestError, RateLimitError
 
@@ -9,6 +11,46 @@ st.set_page_config(
     page_icon="🌿",
     layout="wide",
 )
+
+
+def login_gate():
+    """使用 Streamlit 私密配置验证演示账号。"""
+    if st.session_state.get("authenticated"):
+        with st.sidebar:
+            st.success(f"已登录：{st.session_state.get('username', '用户')}")
+            if st.button("退出登录", use_container_width=True):
+                st.session_state.clear()
+                st.rerun()
+        return
+
+    st.title("🌿 HerbMet")
+    st.subheader("登录中药材代谢研究助手")
+    try:
+        expected_username = str(st.secrets["auth"]["username"])
+        expected_password = str(st.secrets["auth"]["password"])
+    except (KeyError, FileNotFoundError):
+        st.error("网站尚未配置登录账号，请联系管理员完成 Streamlit Secrets 设置。")
+        st.stop()
+
+    with st.form("login_form"):
+        username = st.text_input("账号")
+        password = st.text_input("密码", type="password")
+        login = st.form_submit_button("登录", type="primary")
+
+    if login:
+        username_ok = hmac.compare_digest(username.strip(), expected_username)
+        password_ok = hmac.compare_digest(password, expected_password)
+        if username_ok and password_ok:
+            st.session_state["authenticated"] = True
+            st.session_state["username"] = username.strip()
+            st.rerun()
+        else:
+            st.error("账号或密码不正确。")
+    st.caption("演示账号由网站管理员提供。请勿在此页面填写模型 API Key。")
+    st.stop()
+
+
+login_gate()
 
 
 def display_papers(papers):
