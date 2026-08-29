@@ -98,11 +98,11 @@ def test_account_login(username, password):
                 "options": {"data": {"display_name": expected_username}},
             })
         except Exception as error:
-            st.error(f"测试账号初始化失败：{error}")
+            st.error(f"账号初始化失败：{error}")
             return
     if establish_login(client, response, "platform"):
         st.rerun()
-    st.error("测试账号登录失败，请确认 Supabase 已关闭邮箱确认。")
+    st.error("账号登录失败，请联系管理员检查账户配置。")
 
 
 def email_login(email, password):
@@ -146,21 +146,18 @@ def login_gate():
         return
     st.title("🌿 HerbMet")
     st.subheader("登录中药材代谢研究助手")
-    test_tab, login_tab, register_tab = st.tabs(("测试账号", "邮箱登录", "注册账号"))
-    with test_tab:
-        with st.form("test_login_form"):
-            username = st.text_input("测试账号")
-            password = st.text_input("测试密码", type="password")
-            submitted = st.form_submit_button("登录测试账号", type="primary")
-        if submitted:
-            test_account_login(username, password)
+    login_tab, register_tab = st.tabs(("账号登录", "注册账号"))
     with login_tab:
-        with st.form("email_login_form"):
-            email = st.text_input("邮箱", key="login_email")
-            password = st.text_input("密码", type="password", key="login_password")
+        with st.form("account_login_form"):
+            identifier = st.text_input("账号或邮箱")
+            password = st.text_input("密码", type="password", key="account_password")
             submitted = st.form_submit_button("登录", type="primary")
         if submitted:
-            email_login(email, password)
+            expected_username = str(st.secrets["auth"]["username"])
+            if hmac.compare_digest(identifier.strip(), expected_username):
+                test_account_login(identifier, password)
+            else:
+                email_login(identifier, password)
     with register_tab:
         with st.form("register_form"):
             display_name = st.text_input("显示名称")
@@ -239,7 +236,7 @@ st.title("🌿 HerbMet")
 st.subheader("中药材代谢研究助手")
 st.caption("检索真实文献，按成分整理吸收、分布、代谢与排泄证据。")
 if platform_account:
-    st.info("测试账号已接入平台模型，无需填写 API Key。")
+    st.info("当前账号已接入平台模型，无需填写 API Key。")
 else:
     st.info("普通账号使用自己的模型 API Key；Key 仅保存在当前网页会话中。")
 
@@ -250,7 +247,7 @@ with st.sidebar:
         base_url = str(st.secrets["platform_api"]["base_url"])
         model = str(st.secrets["platform_api"]["model"])
         st.success(f"平台模型：{model}")
-        st.caption("测试账号使用平台额度，请仅提供给可信用户。")
+        st.caption("当前账号使用平台额度，请仅提供给可信用户。")
     else:
         provider = st.selectbox("服务商", ("阿里云百炼", "OpenAI 兼容接口（自定义）"))
         base_url = st.text_input("Base URL", value="https://dashscope.aliyuncs.com/compatible-mode/v1" if provider == "阿里云百炼" else "")
