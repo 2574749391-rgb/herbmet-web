@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import re
+import time
 
 import streamlit as st
 from cryptography.fernet import Fernet, InvalidToken
@@ -37,7 +38,15 @@ def save_login_cookie(session, account_type):
         "account_type": account_type,
     }
     encrypted = session_cipher().encrypt(json.dumps(payload).encode("utf-8")).decode("ascii")
-    cookies.set(COOKIE_NAME, encrypted, max_age=COOKIE_MAX_AGE)
+    cookies.set(
+        COOKIE_NAME,
+        encrypted,
+        max_age=COOKIE_MAX_AGE,
+        secure=True,
+        same_site="lax",
+    )
+    # 给浏览器组件时间写入 Cookie，避免立即 rerun 中断写入。
+    time.sleep(1)
 
 
 def establish_login(client, response, account_type):
@@ -56,6 +65,10 @@ def restore_login():
     if st.session_state.get("authenticated"):
         return
     encrypted = cookies.get(COOKIE_NAME)
+    if encrypted is None:
+        # 组件首次加载时可能先返回空值，短暂等待后再次读取。
+        time.sleep(0.8)
+        encrypted = cookies.get(COOKIE_NAME)
     if not encrypted:
         return
     try:
