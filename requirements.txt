@@ -2,3 +2,6 @@ streamlit
 openai
 python-dotenv
 requests
+supabase
+cryptography
+streamlit-cookies-controller
