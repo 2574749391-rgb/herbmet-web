@@ -1,0 +1,28 @@
+{
+  "herbs": {
+    "麻黄": {"category": "解表药", "scientific_name": "Ephedra sinica", "constituents": ["Ephedrine", "Pseudoephedrine", "Methylephedrine"]},
+    "桂枝": {"category": "解表药", "scientific_name": "Cinnamomum cassia", "constituents": ["Cinnamaldehyde", "Cinnamic acid", "Coumarin"], "research_note": "桂枝为肉桂的嫩枝，不能把树皮或肉桂油研究无条件等同于桂枝。"},
+    "紫苏": {"category": "解表药", "scientific_name": "Perilla frutescens", "constituents": ["Perillaldehyde", "Rosmarinic acid", "Luteolin"]},
+    "生姜": {"category": "解表药", "scientific_name": "Zingiber officinale", "constituents": ["6-Gingerol", "8-Gingerol", "10-Gingerol", "6-Shogaol"]},
+    "葛根": {"category": "解表药", "scientific_name": "Pueraria lobata", "constituents": ["Puerarin", "Daidzein", "Daidzin"]},
+    "石膏": {"category": "清热药", "scientific_name": "Gypsum Fibrosum", "constituents": ["Calcium sulfate dihydrate"], "research_note": "石膏是矿物药，不应套用植物次生代谢物框架；需单独说明钙、硫酸根处置及证据边界。"},
+    "知母": {"category": "清热药", "scientific_name": "Anemarrhena asphodeloides", "constituents": ["Timosaponin BII", "Timosaponin AIII", "Mangiferin"]},
+    "金银花": {"category": "清热药", "scientific_name": "Lonicera japonica", "constituents": ["Chlorogenic acid", "Loganin", "Luteolin"]},
+    "连翘": {"category": "清热药", "scientific_name": "Forsythia suspensa", "constituents": ["Forsythiaside A", "Phillyrin", "Phillygenin"]},
+    "黄连": {"category": "清热药", "scientific_name": "Coptis chinensis", "constituents": ["Berberine", "Coptisine", "Palmatine"]},
+    "人参": {"category": "补气药", "scientific_name": "Panax ginseng", "constituents": ["Ginsenoside Rg1", "Ginsenoside Rb1", "Ginsenoside Rd"]},
+    "黄芪": {"category": "补气药", "scientific_name": "Astragalus membranaceus", "constituents": ["Astragaloside IV", "Cycloastragenol", "Calycosin"]},
+    "党参": {"category": "补气药", "scientific_name": "Codonopsis pilosula", "constituents": ["Lobetyolin", "Tangshenoside I", "Atractylenolide III"]},
+    "甘草": {"category": "补气药", "scientific_name": "Glycyrrhiza uralensis", "constituents": ["Glycyrrhizin", "Glycyrrhetinic acid", "Liquiritigenin"]},
+    "当归": {"category": "补血药", "scientific_name": "Angelica sinensis", "constituents": ["Ferulic acid", "Z-ligustilide", "Senkyunolide A"]},
+    "熟地黄": {"category": "补血药", "scientific_name": "Rehmannia glutinosa", "constituents": ["Catalpol", "Rehmannioside D", "Acteoside"], "research_note": "熟地黄是炮制品，炮制会改变成分谱；鲜地黄、生地黄证据不能直接等同于熟地黄。"},
+    "枸杞": {"category": "补阴药", "scientific_name": "Lycium barbarum", "constituents": ["Betaine", "Zeaxanthin", "Scopoletin"]},
+    "丹参": {"category": "活血化瘀药", "scientific_name": "Salvia miltiorrhiza", "constituents": ["Tanshinone IIA", "Cryptotanshinone", "Salvianolic acid B"]},
+    "川芎": {"category": "活血化瘀药", "scientific_name": "Ligusticum chuanxiong", "constituents": ["Ferulic acid", "Z-ligustilide", "Senkyunolide A"]},
+    "艾叶": {"category": "温经止血药", "scientific_name": "Artemisia argyi", "constituents": ["Eupatilin", "Jaceosidin"]},
+    "银杏": {"category": "其他常用药", "scientific_name": "Ginkgo biloba", "constituents": ["Ginkgolide A", "Ginkgolide B", "Bilobalide"]}
+  },
+  "aliases": {
+    "枸杞子": "枸杞"
+  }
+}

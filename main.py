@@ -1,4 +1,6 @@
+import json
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -100,6 +102,21 @@ HERB_PROFILES = {
 HERB_ALIASES = {
     "枸杞子": "枸杞",
 }
+
+
+def load_herb_catalog():
+    """从独立 JSON 文件加载药材目录，方便后续不改程序即可扩充。"""
+    catalog_path = Path(__file__).with_name("herbs.json")
+    with catalog_path.open("r", encoding="utf-8") as catalog_file:
+        catalog = json.load(catalog_file)
+    herbs = catalog.get("herbs", {})
+    if not herbs:
+        raise RuntimeError("药材目录 herbs.json 为空或格式不正确。")
+    return herbs, catalog.get("aliases", {})
+
+
+# 独立目录是唯一生效的数据源；上面的旧表仅用于旧版本代码回溯。
+HERB_PROFILES, HERB_ALIASES = load_herb_catalog()
 
 
 def resolve_herb(user_input):

@@ -11,7 +11,7 @@ from openai import APIConnectionError, APITimeoutError, AuthenticationError, Bad
 from streamlit_cookies_controller import CookieController
 from supabase import create_client
 
-from main import collect_evidence, generate_report, resolve_herb, terminology_warnings
+from main import HERB_PROFILES, collect_evidence, generate_report, resolve_herb, terminology_warnings
 
 
 st.set_page_config(page_title="HerbMet · 中药材代谢研究助手", page_icon="🌿", layout="wide")
@@ -298,10 +298,23 @@ with st.sidebar:
 
 analysis_tab, history_tab = st.tabs(("新建分析", "我的历史记录"))
 with analysis_tab:
+    categories = ["全部", *sorted({profile.get("category", "其他") for profile in HERB_PROFILES.values()})]
+    category = st.selectbox("功效分类", categories, help="先选分类可以更快找到已收录的药材。")
+    herb_options = [
+        name
+        for name, profile in HERB_PROFILES.items()
+        if category == "全部" or profile.get("category", "其他") == category
+    ]
+    quick_herb = st.selectbox("快速选择药材（可选）", ["手动输入", *herb_options])
     with st.form("analysis_form"):
-        herb = st.text_input("中药材名称", placeholder="例如：黄芪", help="已预设 21 种常见中药材，也可以输入英文学名。")
+        manual_herb = st.text_input(
+            "或直接输入中药材名称",
+            placeholder="例如：黄芪",
+            help="手动输入优先于上方的快速选择，也可以输入尚未收录的药材或英文学名。",
+        )
         submitted = st.form_submit_button("开始分析", type="primary")
     if submitted:
+        herb = manual_herb.strip() or (quick_herb if quick_herb != "手动输入" else "")
         herb, api_key, base_url, model = herb.strip(), api_key.strip(), base_url.strip(), model.strip()
         if not herb:
             st.warning("请输入中药材名称。")
