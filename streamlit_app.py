@@ -11,7 +11,15 @@ from openai import APIConnectionError, APITimeoutError, AuthenticationError, Bad
 from streamlit_cookies_controller import CookieController
 from supabase import create_client
 
-from main import HERB_PROFILES, collect_evidence, generate_report, resolve_herb, terminology_warnings
+from main import (
+    HERB_PROFILES,
+    collect_adme,
+    collect_overview,
+    discover_constituents,
+    generate_report,
+    resolve_herb,
+    terminology_warnings,
+)
 
 
 st.set_page_config(page_title="HerbMet · 中药材代谢研究助手", page_icon="🌿", layout="wide")
@@ -402,7 +410,7 @@ with analysis_tab:
             placeholder="例如：黄芪",
             help="手动输入优先于上方的快速选择，也可以输入尚未收录的药材或英文学名。",
         )
-        submitted = st.form_submit_button("开始分析", type="primary")
+        submitted = st.form_submit_button("第一阶段：发现候选成分", type="primary")
     if submitted:
         herb = manual_herb.strip() or (quick_herb if quick_herb != "手动输入" else "")
         herb, api_key, base_url, model = herb.strip(), api_key.strip(), base_url.strip(), model.strip()
@@ -414,32 +422,79 @@ with analysis_tab:
             st.stop()
         profile = resolve_herb(herb)
         scientific_name = profile["scientific_name"]
-        st.info(f"检索对象：{herb}（{scientific_name}）")
         try:
-            with st.status("正在进行两阶段文献检索…", expanded=True) as status:
-                overview_papers, adme_papers = collect_evidence(profile)
-                status.update(label="文献检索与初筛完成", state="complete")
+            with st.status("第一阶段：正在检索成分概览…", expanded=True) as status:
+                overview_papers = collect_overview(profile)
+                status.write(f"成分概览文献：{len(overview_papers)} 篇")
+                status.write("正在从摘要中识别候选成分…")
+                candidates = discover_constituents(profile, overview_papers, api_key, base_url, model)
+                if not candidates:
+                    candidates = [scientific_name]
+                status.update(label="第一阶段完成，请确认候选成分", state="complete")
         except RuntimeError as error:
             st.error(str(error))
             st.stop()
-        if not adme_papers:
-            st.warning("没有找到达到标准的直接 ADME 或生物转化文献。")
-            st.stop()
-        col1, col2 = st.columns(2)
-        col1.metric("成分概览文献", len(overview_papers))
-        col2.metric("ADME / 生物转化证据", len(adme_papers))
-        try:
-            with st.spinner("正在基于入选证据生成结构化报告…"):
-                report = generate_report(herb, profile, overview_papers, adme_papers, api_key, base_url=base_url, model=model)
         except Exception as error:
             show_model_error(error)
             st.stop()
-        try:
-            save_study(herb, scientific_name, overview_papers, adme_papers, model, report)
-            st.success("分析完成，已保存到您的云端历史记录。")
-        except Exception as error:
-            st.warning(f"报告已生成，但云端保存失败：{error}")
-        display_report(report, herb, [*overview_papers, *adme_papers], "latest-report")
+        st.session_state["stage1_result"] = {
+            "herb": herb,
+            "profile": profile,
+            "overview": overview_papers,
+            "candidates": candidates,
+        }
+
+    stage1 = st.session_state.get("stage1_result")
+    if stage1:
+        st.success(f"第一阶段完成：{stage1['herb']}（{stage1['profile']['scientific_name']}）")
+        st.caption("下面的成分来自药材目录与第一阶段文献摘要。请取消不需要的成分，也可以补充一个英文成分名。")
+        selected_targets = st.multiselect(
+            "候选成分（建议选择 1–5 个）",
+            stage1["candidates"],
+            default=stage1["candidates"][:5],
+        )
+        extra_target = st.text_input("补充成分英文名（可选）", placeholder="例如：Astragaloside II")
+        if st.button("第二阶段：检索 ADME 并生成报告", type="primary"):
+            targets = list(selected_targets)
+            if extra_target.strip() and extra_target.strip().lower() not in {item.lower() for item in targets}:
+                targets.append(extra_target.strip())
+            if not targets:
+                st.warning("请至少选择或填写一个候选成分。")
+                st.stop()
+            api_key, base_url, model = api_key.strip(), base_url.strip(), model.strip()
+            if not api_key or not base_url or not model:
+                st.error("API Key、Base URL 和模型名称都必须填写。")
+                st.stop()
+            with st.status("第二阶段：正在逐个检索 ADME 证据…", expanded=True) as status:
+                for target in targets:
+                    status.write(f"正在检索：{target}")
+                try:
+                    adme_papers = collect_adme(targets)
+                except RuntimeError as error:
+                    st.error(str(error))
+                    st.stop()
+                status.update(label="第二阶段检索完成", state="complete")
+            if not adme_papers:
+                st.warning("没有找到达到标准的直接 ADME 或生物转化文献。可以减少候选成分或更换英文名称后重试。")
+                st.stop()
+            report_profile = dict(stage1["profile"])
+            report_profile["constituents"] = targets
+            col1, col2, col3 = st.columns(3)
+            col1.metric("候选成分", len(targets))
+            col2.metric("成分概览文献", len(stage1["overview"]))
+            col3.metric("ADME / 生物转化证据", len(adme_papers))
+            try:
+                with st.spinner("正在基于入选证据生成结构化报告…"):
+                    report = generate_report(stage1["herb"], report_profile, stage1["overview"], adme_papers, api_key, base_url=base_url, model=model)
+            except Exception as error:
+                show_model_error(error)
+                st.stop()
+            try:
+                save_study(stage1["herb"], report_profile["scientific_name"], stage1["overview"], adme_papers, model, report)
+                st.success("分析完成，已保存到您的云端历史记录。")
+            except Exception as error:
+                st.warning(f"报告已生成，但云端保存失败：{error}")
+            display_report(report, stage1["herb"], [*stage1["overview"], *adme_papers], "latest-report")
 
 with history_tab:
     st.header("我的历史记录")

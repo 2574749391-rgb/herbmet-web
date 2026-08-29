@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -213,7 +214,8 @@ def terminology_warnings(text):
     return warnings
 
 
-def collect_evidence(profile):
+def collect_overview(profile):
+    """第一阶段：获取药材成分概览综述。"""
     scientific_name = profile["scientific_name"]
     overview = label_papers(
         search_literature(build_overview_query(scientific_name),
@@ -225,11 +227,56 @@ def collect_evidence(profile):
         if paper["evidence_type"] == "综述证据"
         and paper["relevance_score"] >= 20
     ][:2]
+    return overview
+
+
+def discover_constituents(profile, overview_papers, api_key, base_url, model):
+    """从第一阶段摘要提取明确出现的候选成分，并与目录预设合并。"""
+    preset = list(profile.get("constituents") or [])
+    if not overview_papers:
+        return preset
+    evidence = "\n\n".join(
+        f"标题：{paper['title']}\n摘要：{paper['abstract']}"
+        for paper in overview_papers
+    )
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": "你是药物化学文献筛选助手，只提取材料中明确出现的具体化合物英文名称，不推测。",
+            },
+            {
+                "role": "user",
+                "content": f"""从以下文献标题和摘要中提取最多 8 个适合继续检索药代动力学的代表性具体化合物。
+不要返回多糖、黄酮、皂苷等大类名称，不要补充材料中未出现的化合物。
+只返回 JSON，格式：{{"constituents": ["Compound A", "Compound B"]}}
+
+{evidence}""",
+            },
+        ],
+    )
+    raw = response.choices[0].message.content or ""
+    match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+    extracted = []
+    if match:
+        try:
+            parsed = json.loads(match.group(0))
+            extracted = [str(item).strip() for item in parsed.get("constituents", []) if str(item).strip()]
+        except (json.JSONDecodeError, TypeError):
+            extracted = []
+    merged = []
+    for item in [*preset, *extracted]:
+        if item.lower() not in {existing.lower() for existing in merged}:
+            merged.append(item)
+    return merged[:8]
+
+
+def collect_adme(targets):
+    """第二阶段：围绕用户确认的候选成分检索直接 ADME 证据。"""
 
     adme_groups = []
-    # 已配置代表性成分时，只把成分级论文送入 ADME 主证据池；
-    # 药材整体论文仅用于成分背景，避免再次混入宽泛药效研究。
-    targets = profile["constituents"] or [scientific_name]
     for target in targets:
         print(f"  正在检索成分/对象：{target}")
         papers = search_literature(build_adme_query(target), search_name=target,
@@ -241,6 +288,14 @@ def collect_evidence(profile):
         if paper["relevance_score"] >= 40
         and paper["evidence_type"] in ("直接ADME证据", "生物转化证据")
     ][:8]
+    return adme
+
+
+def collect_evidence(profile):
+    """兼容命令行使用的一键两阶段检索。"""
+    overview = collect_overview(profile)
+    targets = profile["constituents"] or [profile["scientific_name"]]
+    adme = collect_adme(targets)
     return overview, adme
 
 
