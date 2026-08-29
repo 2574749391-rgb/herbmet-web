@@ -27,34 +27,45 @@ st.set_page_config(page_title="HerbMet · 中药材代谢研究助手", page_ico
 st.markdown(
     """
     <style>
-    .stApp { background: radial-gradient(circle at 75% 0%, rgba(47,158,104,.10), transparent 30%), #0e1117; }
+    html, body, [class*="css"] { font-family: "Songti SC", "STSong", "Noto Serif SC", serif; }
+    .stApp {
+        background-color: #f7f1e6;
+        background-image:
+            radial-gradient(circle at 12% 8%, rgba(139,101,66,.08), transparent 25%),
+            linear-gradient(rgba(116,82,52,.025) 1px, transparent 1px);
+        background-size: auto, 100% 28px;
+        color: #3d2b1f;
+    }
     .block-container { max-width: 1240px; padding-top: 2.2rem; padding-bottom: 3rem; }
     .herbmet-hero {
-        padding: 1.7rem 1.9rem; margin-bottom: 1.1rem; border-radius: 20px;
-        border: 1px solid rgba(91, 207, 145, .23);
-        background: linear-gradient(120deg, rgba(25,72,54,.82), rgba(20,33,46,.72));
-        box-shadow: 0 14px 36px rgba(0,0,0,.18);
+        padding: 1.8rem 2rem; margin-bottom: 1.1rem; border-radius: 14px;
+        border: 1px solid #d7c3a7; border-left: 6px solid #7a4e34;
+        background: linear-gradient(120deg, #fffaf1, #eadcc7);
+        box-shadow: 0 10px 28px rgba(83,57,35,.10);
     }
-    .herbmet-eyebrow { color: #77dfa8; font-size: .82rem; letter-spacing: .13em; font-weight: 700; }
-    .herbmet-title { font-size: 2.25rem; line-height: 1.15; font-weight: 800; margin: .35rem 0 .55rem; color: #f4fff8; }
-    .herbmet-subtitle { color: #b9c8c0; font-size: 1rem; margin: 0; }
+    .herbmet-eyebrow { color: #8a5a3b; font-size: .8rem; letter-spacing: .16em; font-weight: 800; }
+    .herbmet-title { font-size: 2.25rem; line-height: 1.15; font-weight: 800; margin: .4rem 0 .6rem; color: #38251a; }
+    .herbmet-subtitle { color: #776554; font-size: 1rem; margin: 0; }
     .catalog-card {
-        border: 1px solid rgba(255,255,255,.10); border-radius: 16px;
-        padding: 1rem 1.15rem; background: rgba(255,255,255,.025); margin: .5rem 0 1rem;
+        border: 1px solid #ddcdb7; border-radius: 12px;
+        padding: 1rem 1.15rem; background: rgba(255,251,244,.82); margin: .5rem 0 1rem;
     }
-    div[data-testid="stForm"] { border-radius: 16px; border-color: rgba(91,207,145,.20); }
-    div[data-testid="stMetric"] { background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); padding: .8rem 1rem; border-radius: 14px; }
-    .stButton > button, .stFormSubmitButton > button { border-radius: 10px; font-weight: 700; }
+    div[data-testid="stForm"] { border-radius: 12px; border-color: #ddcdb7; background: rgba(255,251,244,.72); }
+    div[data-testid="stMetric"] { background: rgba(255,250,242,.92); border: 1px solid #dfcfb9; padding: .8rem 1rem; border-radius: 12px; box-shadow: 0 4px 14px rgba(83,57,35,.05); }
+    .stButton > button, .stFormSubmitButton > button { border-radius: 8px; font-weight: 700; }
+    div[data-testid="stSidebar"] { border-right: 1px solid #d8c5aa; }
+    div[data-testid="stExpander"] { border-color: #ddcdb7; background: rgba(255,251,244,.55); }
+    hr { border-color: #d8c7b0 !important; }
     .workflow-step {
-        min-height: 112px; padding: 1rem 1.05rem; border-radius: 14px;
-        background: rgba(255,255,255,.028); border: 1px solid rgba(255,255,255,.08);
+        min-height: 112px; padding: 1rem 1.05rem; border-radius: 11px;
+        background: #fffaf2; border: 1px solid #dfcfb9;
     }
-    .workflow-number { color: #6edc9f; font-size: .78rem; font-weight: 800; letter-spacing: .08em; }
-    .workflow-title { color: #edf8f1; font-size: 1.02rem; font-weight: 750; margin: .28rem 0; }
-    .workflow-copy { color: #98a9a0; font-size: .86rem; line-height: 1.45; }
+    .workflow-number { color: #8a5a3b; font-size: .78rem; font-weight: 800; letter-spacing: .08em; }
+    .workflow-title { color: #3d2b1f; font-size: 1.02rem; font-weight: 750; margin: .28rem 0; }
+    .workflow-copy { color: #7d6b5b; font-size: .86rem; line-height: 1.45; }
     @media (max-width: 760px) {
         .block-container { padding: 1rem .8rem 2rem; }
-        .herbmet-hero { padding: 1.25rem 1.15rem; border-radius: 16px; }
+        .herbmet-hero { padding: 1.25rem 1.15rem; border-radius: 12px; }
         .herbmet-title { font-size: 1.65rem; }
         .herbmet-subtitle { font-size: .9rem; }
     }
