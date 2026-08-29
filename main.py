@@ -28,6 +28,26 @@ HERB_PROFILES = {
         "scientific_name": "Angelica sinensis",
         "constituents": ["Ferulic acid", "Z-ligustilide", "Senkyunolide A"],
     },
+    "黄连": {
+        "scientific_name": "Coptis chinensis",
+        "constituents": ["Berberine", "Coptisine", "Palmatine"],
+    },
+    "葛根": {
+        "scientific_name": "Pueraria lobata",
+        "constituents": ["Puerarin", "Daidzein", "Daidzin"],
+    },
+    "川芎": {
+        "scientific_name": "Ligusticum chuanxiong",
+        "constituents": ["Ferulic acid", "Z-ligustilide", "Senkyunolide A"],
+    },
+    "枸杞": {
+        "scientific_name": "Lycium barbarum",
+        "constituents": ["Betaine", "Zeaxanthin", "Scopoletin"],
+    },
+    "银杏": {
+        "scientific_name": "Ginkgo biloba",
+        "constituents": ["Ginkgolide A", "Ginkgolide B", "Bilobalide"],
+    },
 }
 
 

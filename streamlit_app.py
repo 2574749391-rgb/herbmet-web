@@ -1,4 +1,5 @@
 import streamlit as st
+from openai import APIConnectionError, APITimeoutError, AuthenticationError, BadRequestError, RateLimitError
 
 from main import collect_evidence, generate_report, resolve_herb, terminology_warnings
 
@@ -28,10 +29,36 @@ def display_papers(papers):
         st.divider()
 
 
+def show_model_error(error):
+    if isinstance(error, AuthenticationError):
+        st.error("API Key 无效，或它与当前服务商不匹配。请重新复制 Key，并检查服务商和 Base URL。")
+    elif isinstance(error, RateLimitError):
+        st.error("模型服务当前限流，或账号额度/余额不足。请稍后重试并检查服务商控制台。")
+    elif isinstance(error, (APIConnectionError, APITimeoutError)):
+        st.error("暂时无法连接模型服务。请检查 Base URL 和网络，稍后再试。")
+    elif isinstance(error, BadRequestError):
+        st.error("模型拒绝了请求。请检查模型名称是否正确，以及该 Key 是否有权使用此模型。")
+    else:
+        st.error("大模型调用暂时失败。请检查 API 配置后重试。")
+    with st.expander("查看技术详情（排查问题时使用）"):
+        st.code(str(error))
+
+
 st.title("🌿 HerbMet")
 st.subheader("中药材代谢研究助手")
 st.caption("检索真实文献，按成分整理吸收、分布、代谢与排泄证据。")
 st.info("公开体验版：请使用您自己的模型 API Key。Key 仅用于本次会话，不写入项目文件或研究记录。")
+
+with st.expander("第一次使用？查看三步说明"):
+    st.markdown(
+        """
+1. 打开左侧“模型设置”，选择服务商并填写自己的 API Key。
+2. 输入中药材中文名，点击“开始分析”。检索文献本身不消耗模型 Token。
+3. 报告生成后可查看入选文献，并下载 Markdown 报告。
+
+阿里云百炼默认使用 `qwen-plus`。学校或其他 OpenAI 兼容服务请选择“自定义”，并填写服务方提供的 Base URL 和模型名称。请勿使用或分享他人的 API Key。
+        """
+    )
 
 with st.sidebar:
     st.header("模型设置")
@@ -56,7 +83,7 @@ with st.form("analysis_form"):
     herb = st.text_input(
         "中药材名称",
         placeholder="例如：黄芪",
-        help="当前优先支持：黄芪、人参、丹参、甘草、当归，也可以输入英文学名。",
+        help="已预设：黄芪、人参、丹参、甘草、当归、黄连、葛根、川芎、枸杞、银杏，也可以输入英文学名。",
     )
     submitted = st.form_submit_button("开始分析", type="primary")
 
@@ -109,7 +136,7 @@ if submitted:
                 model=model,
             )
     except Exception as error:
-        st.error(f"大模型调用暂时失败：{error}")
+        show_model_error(error)
         st.stop()
 
     st.success("分析完成。")
