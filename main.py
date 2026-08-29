@@ -48,13 +48,65 @@ HERB_PROFILES = {
         "scientific_name": "Ginkgo biloba",
         "constituents": ["Ginkgolide A", "Ginkgolide B", "Bilobalide"],
     },
+    "生姜": {
+        "scientific_name": "Zingiber officinale",
+        "constituents": ["6-Gingerol", "8-Gingerol", "10-Gingerol", "6-Shogaol"],
+    },
+    "艾叶": {
+        "scientific_name": "Artemisia argyi",
+        "constituents": ["Eupatilin", "Jaceosidin"],
+    },
+    "麻黄": {
+        "scientific_name": "Ephedra sinica",
+        "constituents": ["Ephedrine", "Pseudoephedrine", "Methylephedrine"],
+    },
+    "桂枝": {
+        "scientific_name": "Cinnamomum cassia",
+        "constituents": ["Cinnamaldehyde", "Cinnamic acid", "Coumarin"],
+        "research_note": "桂枝为肉桂的嫩枝，不能把树皮或肉桂油研究无条件等同于桂枝。",
+    },
+    "紫苏": {
+        "scientific_name": "Perilla frutescens",
+        "constituents": ["Perillaldehyde", "Rosmarinic acid", "Luteolin"],
+    },
+    "石膏": {
+        "scientific_name": "Gypsum Fibrosum",
+        "constituents": ["Calcium sulfate dihydrate"],
+        "research_note": "石膏是矿物药，不应套用植物次生代谢物框架；需单独说明钙、硫酸根处置及证据边界。",
+    },
+    "知母": {
+        "scientific_name": "Anemarrhena asphodeloides",
+        "constituents": ["Timosaponin BII", "Timosaponin AIII", "Mangiferin"],
+    },
+    "金银花": {
+        "scientific_name": "Lonicera japonica",
+        "constituents": ["Chlorogenic acid", "Loganin", "Luteolin"],
+    },
+    "连翘": {
+        "scientific_name": "Forsythia suspensa",
+        "constituents": ["Forsythiaside A", "Phillyrin", "Phillygenin"],
+    },
+    "党参": {
+        "scientific_name": "Codonopsis pilosula",
+        "constituents": ["Lobetyolin", "Tangshenoside I", "Atractylenolide III"],
+    },
+    "熟地黄": {
+        "scientific_name": "Rehmannia glutinosa",
+        "constituents": ["Catalpol", "Rehmannioside D", "Acteoside"],
+        "research_note": "熟地黄是炮制品，炮制会改变成分谱；鲜地黄、生地黄证据不能直接等同于熟地黄。",
+    },
+}
+
+HERB_ALIASES = {
+    "枸杞子": "枸杞",
 }
 
 
 def resolve_herb(user_input):
+    user_input = HERB_ALIASES.get(user_input, user_input)
     if user_input in HERB_PROFILES:
         return HERB_PROFILES[user_input]
-    return {"scientific_name": user_input, "constituents": []}
+    return {"scientific_name": user_input, "constituents": [], "research_note": ""}
 
 
 def build_overview_query(scientific_name):
@@ -195,6 +247,7 @@ def generate_report(
             {"role": "user", "content": f"""请分析中药材：{herb}
 学名：{scientific_name}
 预设代表性成分：{'、'.join(profile['constituents']) or '未预设'}
+对象特别说明：{profile.get('research_note') or '无'}
 
 下面的证据已分为“药材成分概览”和“成分级 ADME/生物转化”：
 

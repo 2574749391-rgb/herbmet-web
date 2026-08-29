@@ -299,7 +299,7 @@ with st.sidebar:
 analysis_tab, history_tab = st.tabs(("新建分析", "我的历史记录"))
 with analysis_tab:
     with st.form("analysis_form"):
-        herb = st.text_input("中药材名称", placeholder="例如：黄芪", help="已预设 10 种常见中药材，也可以输入英文学名。")
+        herb = st.text_input("中药材名称", placeholder="例如：黄芪", help="已预设 21 种常见中药材，也可以输入英文学名。")
         submitted = st.form_submit_button("开始分析", type="primary")
     if submitted:
         herb, api_key, base_url, model = herb.strip(), api_key.strip(), base_url.strip(), model.strip()
