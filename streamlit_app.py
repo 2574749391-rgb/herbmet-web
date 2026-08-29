@@ -16,9 +16,53 @@ from main import HERB_PROFILES, collect_evidence, generate_report, resolve_herb,
 
 st.set_page_config(page_title="HerbMet · 中药材代谢研究助手", page_icon="🌿", layout="wide")
 
+st.markdown(
+    """
+    <style>
+    .stApp { background: radial-gradient(circle at 75% 0%, rgba(47,158,104,.10), transparent 30%), #0e1117; }
+    .block-container { max-width: 1240px; padding-top: 2.2rem; padding-bottom: 3rem; }
+    .herbmet-hero {
+        padding: 1.7rem 1.9rem; margin-bottom: 1.1rem; border-radius: 20px;
+        border: 1px solid rgba(91, 207, 145, .23);
+        background: linear-gradient(120deg, rgba(25,72,54,.82), rgba(20,33,46,.72));
+        box-shadow: 0 14px 36px rgba(0,0,0,.18);
+    }
+    .herbmet-eyebrow { color: #77dfa8; font-size: .82rem; letter-spacing: .13em; font-weight: 700; }
+    .herbmet-title { font-size: 2.25rem; line-height: 1.15; font-weight: 800; margin: .35rem 0 .55rem; color: #f4fff8; }
+    .herbmet-subtitle { color: #b9c8c0; font-size: 1rem; margin: 0; }
+    .catalog-card {
+        border: 1px solid rgba(255,255,255,.10); border-radius: 16px;
+        padding: 1rem 1.15rem; background: rgba(255,255,255,.025); margin: .5rem 0 1rem;
+    }
+    div[data-testid="stForm"] { border-radius: 16px; border-color: rgba(91,207,145,.20); }
+    div[data-testid="stMetric"] { background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); padding: .8rem 1rem; border-radius: 14px; }
+    .stButton > button, .stFormSubmitButton > button { border-radius: 10px; font-weight: 700; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 COOKIE_NAME = "herbmet_session_v1"
 COOKIE_MAX_AGE = 30 * 24 * 60 * 60
 cookies = CookieController(key="herbmet-cookies")
+
+CATEGORY_FALLBACK = {
+    "解表药": ("麻黄", "桂枝", "紫苏", "生姜", "葛根"),
+    "清热药": ("石膏", "知母", "金银花", "连翘", "黄连"),
+    "补气药": ("人参", "黄芪", "党参", "甘草"),
+    "补血药": ("当归", "熟地黄"),
+    "补阴药": ("枸杞",),
+    "活血化瘀药": ("丹参", "川芎"),
+    "温经止血药": ("艾叶",),
+    "其他常用药": ("银杏",),
+}
+
+
+def herb_category(name, profile):
+    category = profile.get("category")
+    if category:
+        return category
+    return next((group for group, names in CATEGORY_FALLBACK.items() if name in names), "其他")
 
 
 def supabase_client():
@@ -274,9 +318,16 @@ def show_model_error(error):
 login_gate()
 platform_account = st.session_state.get("account_type") == "platform"
 
-st.title("🌿 HerbMet")
-st.subheader("中药材代谢研究助手")
-st.caption("检索真实文献，按成分整理吸收、分布、代谢与排泄证据。")
+st.markdown(
+    """
+    <section class="herbmet-hero">
+      <div class="herbmet-eyebrow">HERBMET · EVIDENCE RESEARCH</div>
+      <div class="herbmet-title">🌿 中药材代谢研究助手</div>
+      <p class="herbmet-subtitle">从真实文献出发，自动整理代表性成分的吸收、分布、代谢与排泄证据。</p>
+    </section>
+    """,
+    unsafe_allow_html=True,
+)
 if platform_account:
     st.info("当前账号已接入平台模型，无需填写 API Key。")
 else:
@@ -298,14 +349,27 @@ with st.sidebar:
 
 analysis_tab, history_tab = st.tabs(("新建分析", "我的历史记录"))
 with analysis_tab:
-    categories = ["全部", *sorted({profile.get("category", "其他") for profile in HERB_PROFILES.values()})]
-    category = st.selectbox("功效分类", categories, help="先选分类可以更快找到已收录的药材。")
+    catalog_categories = {herb_category(name, profile) for name, profile in HERB_PROFILES.items()}
+    categories = ["全部", *[name for name in CATEGORY_FALLBACK if name in catalog_categories]]
+    categories.extend(sorted(catalog_categories - set(categories)))
+    st.markdown(
+        f'<div class="catalog-card"><b>药材知识库</b><br><span style="color:#9fb0a7">已收录 {len(HERB_PROFILES)} 种常用药材，选择分类可快速定位，也可直接输入其他药材。</span></div>',
+        unsafe_allow_html=True,
+    )
+    picker_left, picker_right = st.columns((1, 1.35), gap="medium")
+    with picker_left:
+        category = st.selectbox("功效分类", categories, help="先选分类可以更快找到已收录的药材。")
     herb_options = [
         name
         for name, profile in HERB_PROFILES.items()
-        if category == "全部" or profile.get("category", "其他") == category
+        if category == "全部" or herb_category(name, profile) == category
     ]
-    quick_herb = st.selectbox("快速选择药材（可选）", ["手动输入", *herb_options])
+    with picker_right:
+        quick_herb = st.selectbox("快速选择药材", ["手动输入", *herb_options])
+    if quick_herb != "手动输入":
+        selected_profile = HERB_PROFILES[quick_herb]
+        components = "、".join(selected_profile.get("constituents", [])[:4]) or "检索后识别"
+        st.caption(f"已选择：{quick_herb} · {selected_profile.get('scientific_name', '')}　｜　代表性成分：{components}")
     with st.form("analysis_form"):
         manual_herb = st.text_input(
             "或直接输入中药材名称",
