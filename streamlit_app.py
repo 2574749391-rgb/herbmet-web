@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 
 import streamlit as st
 from cryptography.fernet import Fernet, InvalidToken
@@ -106,6 +107,9 @@ def test_account_login(username, password):
 
 
 def email_login(email, password):
+    if not valid_email(email):
+        st.error("邮箱格式不正确，请输入类似 name@example.com 的完整邮箱地址。")
+        return
     try:
         client = supabase_client()
         response = client.auth.sign_in_with_password({"email": email.strip(), "password": password})
@@ -116,6 +120,12 @@ def email_login(email, password):
 
 
 def email_register(display_name, email, password, password_again):
+    if not display_name.strip():
+        st.error("请输入显示名称。")
+        return
+    if not valid_email(email):
+        st.error("邮箱格式不正确，请输入类似 name@example.com 的完整邮箱地址。")
+        return
     if len(password) < 8:
         st.error("密码至少需要 8 位。")
         return
@@ -133,7 +143,26 @@ def email_register(display_name, email, password, password_again):
             st.rerun()
         st.success("注册成功。请前往邮箱完成确认后再登录。")
     except Exception as error:
-        st.error(f"注册失败：{error}")
+        st.error(f"注册失败：{friendly_auth_error(error)}")
+
+
+def valid_email(email):
+    return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email.strip()))
+
+
+def friendly_auth_error(error):
+    message = str(error).lower()
+    if "invalid format" in message or "validate email" in message:
+        return "邮箱格式不正确。"
+    if "already registered" in message or "already exists" in message:
+        return "该邮箱已经注册，请直接登录。"
+    if "password" in message and ("weak" in message or "characters" in message):
+        return "密码不符合要求，请使用至少 8 位密码。"
+    if "rate limit" in message or "too many" in message:
+        return "操作过于频繁，请稍后再试。"
+    if "signup" in message and "disabled" in message:
+        return "当前暂未开放新用户注册。"
+    return "暂时无法完成注册，请稍后重试。"
 
 
 def login_gate():
