@@ -37,6 +37,19 @@ st.markdown(
     div[data-testid="stForm"] { border-radius: 16px; border-color: rgba(91,207,145,.20); }
     div[data-testid="stMetric"] { background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); padding: .8rem 1rem; border-radius: 14px; }
     .stButton > button, .stFormSubmitButton > button { border-radius: 10px; font-weight: 700; }
+    .workflow-step {
+        min-height: 112px; padding: 1rem 1.05rem; border-radius: 14px;
+        background: rgba(255,255,255,.028); border: 1px solid rgba(255,255,255,.08);
+    }
+    .workflow-number { color: #6edc9f; font-size: .78rem; font-weight: 800; letter-spacing: .08em; }
+    .workflow-title { color: #edf8f1; font-size: 1.02rem; font-weight: 750; margin: .28rem 0; }
+    .workflow-copy { color: #98a9a0; font-size: .86rem; line-height: 1.45; }
+    @media (max-width: 760px) {
+        .block-container { padding: 1rem .8rem 2rem; }
+        .herbmet-hero { padding: 1.25rem 1.15rem; border-radius: 16px; }
+        .herbmet-title { font-size: 1.65rem; }
+        .herbmet-subtitle { font-size: .9rem; }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -328,6 +341,19 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+overview_1, overview_2, overview_3 = st.columns(3)
+overview_1.metric("预设药材", f"{len(HERB_PROFILES)} 种")
+overview_2.metric("功效分类", f"{len({herb_category(n, p) for n, p in HERB_PROFILES.items()})} 类")
+overview_3.metric("分析流程", "两阶段检索")
+
+with st.expander("第一次使用？查看三步说明", expanded=False):
+    guide_1, guide_2, guide_3 = st.columns(3)
+    with guide_1:
+        st.markdown('<div class="workflow-step"><div class="workflow-number">STEP 01</div><div class="workflow-title">选择药材</div><div class="workflow-copy">按功效分类快速选择，或直接输入中文名、英文学名。</div></div>', unsafe_allow_html=True)
+    with guide_2:
+        st.markdown('<div class="workflow-step"><div class="workflow-number">STEP 02</div><div class="workflow-title">检索与筛选</div><div class="workflow-copy">先查成分概览，再围绕代表性成分检索直接 ADME 证据。</div></div>', unsafe_allow_html=True)
+    with guide_3:
+        st.markdown('<div class="workflow-step"><div class="workflow-number">STEP 03</div><div class="workflow-title">生成报告</div><div class="workflow-copy">整理吸收、分布、代谢、排泄、酶与证据局限，并保存历史。</div></div>', unsafe_allow_html=True)
 if platform_account:
     st.info("当前账号已接入平台模型，无需填写 API Key。")
 else:
