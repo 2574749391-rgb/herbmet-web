@@ -365,7 +365,7 @@ with st.expander("第一次使用？查看三步说明", expanded=False):
 if platform_account:
     st.info("当前账号已接入平台模型，无需填写 API Key。")
 else:
-    st.info("普通账号使用自己的模型 API Key；Key 仅保存在当前网页会话中。")
+    st.info("普通账号可以无 Key 使用第一阶段基础检索；填写自己的模型 API Key 后可自动发现新成分并生成报告。")
 
 with st.sidebar:
     st.header("模型设置")
@@ -380,6 +380,20 @@ with st.sidebar:
         base_url = st.text_input("Base URL", value="https://dashscope.aliyuncs.com/compatible-mode/v1" if provider == "阿里云百炼" else "")
         model = st.text_input("模型名称", value="qwen-plus" if provider == "阿里云百炼" else "")
         api_key = st.text_input("API Key", type="password", placeholder="仅用于当前会话")
+
+if api_key.strip():
+    st.success("当前模式：有 Key 增强模式 · 自动提取候选成分，并可完成 ADME 报告")
+else:
+    st.warning("当前模式：无 Key 基础模式 · 可检索成分概览并读取预设成分；自动提取和报告生成不可用")
+
+with st.expander("无 Key与有 Key有什么区别？", expanded=False):
+    mode_left, mode_right = st.columns(2)
+    with mode_left:
+        st.markdown("**无 Key基础模式**")
+        st.markdown("- 检索成分概览文献\n- 显示目录预设代表性成分\n- 不调用模型、不消耗 Token\n- 目录外药材不能自动识别新成分")
+    with mode_right:
+        st.markdown("**有 Key增强模式**")
+        st.markdown("- 包含基础模式全部功能\n- 从文献摘要自动提取新成分\n- 可继续检索 ADME 并生成报告\n- 提取和报告生成会消耗 Token")
 
 analysis_tab, history_tab = st.tabs(("新建分析", "我的历史记录"))
 with analysis_tab:
@@ -417,8 +431,8 @@ with analysis_tab:
         if not herb:
             st.warning("请输入中药材名称。")
             st.stop()
-        if not api_key or not base_url or not model:
-            st.error("API Key、Base URL 和模型名称都必须填写。")
+        if api_key and (not base_url or not model):
+            st.error("使用增强模式时，Base URL 和模型名称必须填写。")
             st.stop()
         profile = resolve_herb(herb)
         scientific_name = profile["scientific_name"]
@@ -426,10 +440,14 @@ with analysis_tab:
             with st.status("第一阶段：正在检索成分概览…", expanded=True) as status:
                 overview_papers = collect_overview(profile)
                 status.write(f"成分概览文献：{len(overview_papers)} 篇")
-                status.write("正在从摘要中识别候选成分…")
-                candidates = discover_constituents(profile, overview_papers, api_key, base_url, model)
-                if not candidates:
-                    candidates = [scientific_name]
+                if api_key:
+                    status.write("增强模式：正在从摘要中识别候选成分…")
+                    candidates = discover_constituents(profile, overview_papers, api_key, base_url, model)
+                    discovery_mode = "有 Key增强模式"
+                else:
+                    status.write("基础模式：读取药材目录中的预设成分，不调用模型。")
+                    candidates = list(profile.get("constituents") or [])
+                    discovery_mode = "无 Key基础模式"
                 status.update(label="第一阶段完成，请确认候选成分", state="complete")
         except RuntimeError as error:
             st.error(str(error))
@@ -442,12 +460,15 @@ with analysis_tab:
             "profile": profile,
             "overview": overview_papers,
             "candidates": candidates,
+            "mode": discovery_mode,
         }
 
     stage1 = st.session_state.get("stage1_result")
     if stage1:
-        st.success(f"第一阶段完成：{stage1['herb']}（{stage1['profile']['scientific_name']}）")
+        st.success(f"第一阶段完成：{stage1['herb']}（{stage1['profile']['scientific_name']}） · {stage1.get('mode', '基础模式')}")
         st.caption("下面的成分来自药材目录与第一阶段文献摘要。请取消不需要的成分，也可以补充一个英文成分名。")
+        if not stage1["candidates"]:
+            st.warning("该药材不在预设目录中，无 Key模式无法自动识别候选成分。您可以填写成分英文名，或添加 API Key 后重新运行第一阶段。")
         selected_targets = st.multiselect(
             "候选成分（建议选择 1–5 个）",
             stage1["candidates"],
