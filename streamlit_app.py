@@ -2,7 +2,6 @@ import base64
 import hashlib
 import hmac
 import json
-from datetime import date
 
 import streamlit as st
 from cryptography.fernet import Fernet, InvalidToken
@@ -17,7 +16,6 @@ st.set_page_config(page_title="HerbMet · 中药材代谢研究助手", page_ico
 
 COOKIE_NAME = "herbmet_session_v1"
 COOKIE_MAX_AGE = 30 * 24 * 60 * 60
-PLATFORM_DAILY_LIMIT = 3
 cookies = CookieController(key="herbmet-cookies")
 
 
@@ -176,19 +174,6 @@ def login_gate():
     st.stop()
 
 
-@st.cache_resource
-def platform_usage_store():
-    return {}
-
-
-def platform_usage_key():
-    return f"{date.today().isoformat()}:{st.session_state.get('user_id', '')}"
-
-
-def platform_runs_used():
-    return platform_usage_store().get(platform_usage_key(), 0)
-
-
 def display_papers(papers):
     for index, paper in enumerate(papers, start=1):
         st.markdown(f"**{index}. {paper['title']}**")
@@ -254,7 +239,7 @@ st.title("🌿 HerbMet")
 st.subheader("中药材代谢研究助手")
 st.caption("检索真实文献，按成分整理吸收、分布、代谢与排泄证据。")
 if platform_account:
-    st.info("测试账号已接入平台模型，无需填写 API Key。当前临时限制为每日最多分析 3 次。")
+    st.info("测试账号已接入平台模型，无需填写 API Key。")
 else:
     st.info("普通账号使用自己的模型 API Key；Key 仅保存在当前网页会话中。")
 
@@ -265,7 +250,7 @@ with st.sidebar:
         base_url = str(st.secrets["platform_api"]["base_url"])
         model = str(st.secrets["platform_api"]["model"])
         st.success(f"平台模型：{model}")
-        st.metric("今日临时剩余次数", max(0, PLATFORM_DAILY_LIMIT - platform_runs_used()))
+        st.caption("测试账号使用平台额度，请仅提供给可信用户。")
     else:
         provider = st.selectbox("服务商", ("阿里云百炼", "OpenAI 兼容接口（自定义）"))
         base_url = st.text_input("Base URL", value="https://dashscope.aliyuncs.com/compatible-mode/v1" if provider == "阿里云百炼" else "")
@@ -281,9 +266,6 @@ with analysis_tab:
         herb, api_key, base_url, model = herb.strip(), api_key.strip(), base_url.strip(), model.strip()
         if not herb:
             st.warning("请输入中药材名称。")
-            st.stop()
-        if platform_account and platform_runs_used() >= PLATFORM_DAILY_LIMIT:
-            st.error("测试账号今天的 3 次平台分析额度已用完。")
             st.stop()
         if not api_key or not base_url or not model:
             st.error("API Key、Base URL 和模型名称都必须填写。")
@@ -305,9 +287,6 @@ with analysis_tab:
         col1.metric("成分概览文献", len(overview_papers))
         col2.metric("ADME / 生物转化证据", len(adme_papers))
         try:
-            if platform_account:
-                usage = platform_usage_store()
-                usage[platform_usage_key()] = usage.get(platform_usage_key(), 0) + 1
             with st.spinner("正在基于入选证据生成结构化报告…"):
                 report = generate_report(herb, profile, overview_papers, adme_papers, api_key, base_url=base_url, model=model)
         except Exception as error:
