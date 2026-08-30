@@ -1,9 +1,12 @@
 import base64
+import csv
 import hashlib
 import hmac
+import io
 import json
 import re
 import time
+from collections import Counter
 
 import streamlit as st
 from cryptography.fernet import Fernet, InvalidToken
@@ -344,8 +347,53 @@ def display_screening_audit(excluded_papers, title="查看未纳入文献与原�
             )
 
 
+def papers_to_csv(papers):
+    """把入选文献整理为便于 Excel 打开的 UTF-8 CSV。"""
+    output = io.StringIO()
+    fields = ("研究目标", "标题", "作者", "年份", "研究场景", "证据等级", "证据类型", "相关性", "PMID", "DOI")
+    writer = csv.DictWriter(output, fieldnames=fields)
+    writer.writeheader()
+    for paper in papers:
+        writer.writerow({
+            "研究目标": paper.get("research_target", ""),
+            "标题": paper.get("title", ""),
+            "作者": paper.get("authors", ""),
+            "年份": paper.get("year", ""),
+            "研究场景": paper.get("study_context", "研究场景未明确"),
+            "证据等级": paper.get("evidence_grade", "D"),
+            "证据类型": paper.get("evidence_type", ""),
+            "相关性": paper.get("relevance_score", 0),
+            "PMID": paper.get("pmid", ""),
+            "DOI": paper.get("doi", ""),
+        })
+    return "\ufeff" + output.getvalue()
+
+
+def display_evidence_overview(papers, herb, download_key):
+    contexts = Counter(paper.get("study_context", "研究场景未明确") for paper in papers)
+    human = contexts["人体研究"]
+    animal = contexts["动物体内研究"]
+    laboratory = contexts["体外研究"] + contexts["肠道菌群/微生物转化"]
+    other = len(papers) - human - animal - laboratory
+    st.subheader("证据结构概览")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("人体研究", human)
+    c2.metric("动物体内", animal)
+    c3.metric("体外 / 菌群", laboratory)
+    c4.metric("综述 / 未明确", other)
+    st.caption("A–D 仅表示研究场景层级，不能替代对论文质量、偏倚风险和全文的人工评价。")
+    st.download_button(
+        "下载入选文献清单（CSV）",
+        data=papers_to_csv(papers),
+        file_name=f"HerbMet-{herb}-papers.csv",
+        mime="text/csv",
+        key=f"{download_key}-papers",
+    )
+
+
 def display_report(report, herb, papers=None, download_key="report"):
     if papers:
+        display_evidence_overview(papers, herb, download_key)
         with st.expander("查看入选文献与相关性", expanded=False):
             display_papers(papers)
     st.header("文献分析报告")
