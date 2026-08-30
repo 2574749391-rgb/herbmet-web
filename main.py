@@ -187,6 +187,8 @@ def format_literature(papers):
 证据用途：{paper['evidence_role']}
 研究目标：{targets}
 证据类型：{paper['evidence_type']}
+研究场景：{paper.get('study_context', '未标记')}
+证据等级：{paper.get('evidence_grade', '未标记')}（仅表示研究场景层级，不代表论文质量）
 规则初筛相关性：{paper['relevance_score']}/100
 标题：{paper['title']}
 作者：{paper['authors']}
@@ -214,20 +216,33 @@ def terminology_warnings(text):
     return warnings
 
 
-def collect_overview(profile):
+def collect_overview(profile, return_audit=False):
     """第一阶段：获取药材成分概览综述。"""
     scientific_name = profile["scientific_name"]
-    overview = label_papers(
+    candidates = label_papers(
         search_literature(build_overview_query(scientific_name),
                           search_name=scientific_name, max_results=5),
         scientific_name, "药材成分概览",
     )
     overview = [
-        paper for paper in overview
+        paper for paper in candidates
         if paper["evidence_type"] == "综述证据"
         and paper["relevance_score"] >= 20
     ][:2]
-    return overview
+    included_keys = {paper_key(paper) for paper in overview}
+    excluded = []
+    for paper in candidates:
+        if paper_key(paper) in included_keys:
+            continue
+        item = dict(paper)
+        if paper["evidence_type"] != "综述证据":
+            item["exclusion_reason"] = "不是成分概览综述"
+        elif paper["relevance_score"] < 20:
+            item["exclusion_reason"] = "相关性评分低于 20"
+        else:
+            item["exclusion_reason"] = "超过概览文献数量上限"
+        excluded.append(item)
+    return (overview, excluded) if return_audit else overview
 
 
 def discover_constituents(profile, overview_papers, api_key, base_url, model):
@@ -273,7 +288,7 @@ def discover_constituents(profile, overview_papers, api_key, base_url, model):
     return merged[:8]
 
 
-def collect_adme(targets):
+def collect_adme(targets, return_audit=False):
     """第二阶段：围绕用户确认的候选成分检索直接 ADME 证据。"""
 
     adme_groups = []
@@ -283,12 +298,27 @@ def collect_adme(targets):
                                    max_results=6)
         adme_groups.append(label_papers(papers, target, "ADME/生物转化"))
 
-    adme = [
-        paper for paper in merge_papers(adme_groups)
+    candidates = merge_papers(adme_groups)
+    eligible = [
+        paper for paper in candidates
         if paper["relevance_score"] >= 40
         and paper["evidence_type"] in ("直接ADME证据", "生物转化证据")
-    ][:8]
-    return adme
+    ]
+    adme = eligible[:8]
+    included_keys = {paper_key(paper) for paper in adme}
+    excluded = []
+    for paper in candidates:
+        if paper_key(paper) in included_keys:
+            continue
+        item = dict(paper)
+        if paper["relevance_score"] < 40:
+            item["exclusion_reason"] = "相关性评分低于 40"
+        elif paper["evidence_type"] not in ("直接ADME证据", "生物转化证据"):
+            item["exclusion_reason"] = "缺少直接 ADME 或生物转化终点"
+        else:
+            item["exclusion_reason"] = "超过主证据数量上限"
+        excluded.append(item)
+    return (adme, excluded) if return_audit else adme
 
 
 def collect_evidence(profile):

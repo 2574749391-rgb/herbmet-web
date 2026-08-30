@@ -316,7 +316,11 @@ def login_gate():
 def display_papers(papers):
     for index, paper in enumerate(papers, start=1):
         st.markdown(f"**{index}. {paper['title']}**")
-        st.caption(f"目标：{paper.get('research_target', '未知')} ｜ {paper['evidence_type']} ｜ 相关性：{paper['relevance_score']}/100")
+        st.caption(
+            f"目标：{paper.get('research_target', '未知')} ｜ {paper['evidence_type']} ｜ "
+            f"{paper.get('study_context', '研究场景未明确')} ｜ 等级 {paper.get('evidence_grade', 'D')} ｜ "
+            f"相关性：{paper['relevance_score']}/100"
+        )
         identifiers = []
         if paper.get("pmid"):
             identifiers.append(f"[PMID {paper['pmid']}](https://pubmed.ncbi.nlm.nih.gov/{paper['pmid']}/)")
@@ -324,6 +328,20 @@ def display_papers(papers):
             identifiers.append(f"DOI: {paper['doi']}")
         st.markdown(" ｜ ".join(identifiers) or "无 PMID/DOI")
         st.divider()
+
+
+def display_screening_audit(excluded_papers, title="查看未纳入文献与原因"):
+    if not excluded_papers:
+        return
+    with st.expander(f"{title}（{len(excluded_papers)} 篇）", expanded=False):
+        st.caption("排除仅针对本次快速报告，不代表论文没有科研价值。")
+        for index, paper in enumerate(excluded_papers, start=1):
+            st.markdown(f"**{index}. {paper['title']}**")
+            st.caption(
+                f"排除原因：{paper.get('exclusion_reason', '未达到筛选标准')} ｜ "
+                f"相关性：{paper.get('relevance_score', 0)}/100 ｜ "
+                f"{paper.get('study_context', '研究场景未明确')}"
+            )
 
 
 def display_report(report, herb, papers=None, download_key="report"):
@@ -567,7 +585,7 @@ with analysis_tab:
         scientific_name = profile["scientific_name"]
         try:
             with st.status("第一阶段：正在检索成分概览…", expanded=True) as status:
-                overview_papers = collect_overview(profile)
+                overview_papers, overview_excluded = collect_overview(profile, return_audit=True)
                 status.write(f"成分概览文献：{len(overview_papers)} 篇")
                 if api_key:
                     status.write("增强模式：正在从摘要中识别候选成分…")
@@ -588,6 +606,7 @@ with analysis_tab:
             "herb": herb,
             "profile": profile,
             "overview": overview_papers,
+            "overview_excluded": overview_excluded,
             "candidates": candidates,
             "mode": discovery_mode,
         }
@@ -595,6 +614,7 @@ with analysis_tab:
     stage1 = st.session_state.get("stage1_result")
     if stage1:
         st.success(f"第一阶段完成：{stage1['herb']}（{stage1['profile']['scientific_name']}） · {stage1.get('mode', '基础模式')}")
+        display_screening_audit(stage1.get("overview_excluded", []), "查看第一阶段未纳入文献与原因")
         st.caption("下面的成分来自药材目录与第一阶段文献摘要。请取消不需要的成分，也可以补充一个英文成分名。")
         if not stage1["candidates"]:
             st.warning("该药材不在预设目录中，无 Key模式无法自动识别候选成分。您可以填写成分英文名，或添加 API Key 后重新运行第一阶段。")
@@ -619,7 +639,7 @@ with analysis_tab:
                 for target in targets:
                     status.write(f"正在检索：{target}")
                 try:
-                    adme_papers = collect_adme(targets)
+                    adme_papers, adme_excluded = collect_adme(targets, return_audit=True)
                 except RuntimeError as error:
                     st.error(str(error))
                     st.stop()
@@ -633,6 +653,7 @@ with analysis_tab:
             col1.metric("候选成分", len(targets))
             col2.metric("成分概览文献", len(stage1["overview"]))
             col3.metric("ADME / 生物转化证据", len(adme_papers))
+            display_screening_audit(adme_excluded, "查看第二阶段未纳入文献与原因")
             try:
                 with st.spinner("正在基于入选证据生成结构化报告…"):
                     report = generate_report(stage1["herb"], report_profile, stage1["overview"], adme_papers, api_key, base_url=base_url, model=model)

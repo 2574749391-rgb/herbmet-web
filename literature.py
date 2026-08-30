@@ -38,6 +38,22 @@ INDIRECT_CONTEXT_TERMS = (
 )
 
 
+def classify_study_context(paper):
+    """按标题、摘要和出版类型给出透明的研究场景标签，不替代人工质量评价。"""
+    text = f"{paper['title']} {paper['abstract']} {' '.join(paper.get('publication_types', []))}".lower()
+    if "review" in text or "meta-analysis" in text:
+        return "综述证据", "D"
+    if any(term in text for term in ("healthy volunteer", "human pharmacokinetic", "clinical trial", "patients", "subjects")):
+        return "人体研究", "A"
+    if any(term in text for term in ("rat", "rats", "mouse", "mice", "rabbit", "dog", "beagle", "zebrafish")):
+        return "动物体内研究", "B"
+    if any(term in text for term in ("gut microbiota", "intestinal bacteria", "microbial transformation", "fecal fermentation")):
+        return "肠道菌群/微生物转化", "C"
+    if any(term in text for term in ("in vitro", "caco-2", "microsome", "hepatocyte", "cell culture")):
+        return "体外研究", "C"
+    return "研究场景未明确", "D"
+
+
 def create_session():
     """创建带自动重试的网络会话。"""
     retry = Retry(total=3, backoff_factor=0.8,
@@ -153,6 +169,7 @@ def search_literature(query, search_name, max_results=10):
         }
         (paper["relevance_score"], paper["relevance_reasons"],
          paper["evidence_type"]) = score_relevance(paper, search_name)
+        paper["study_context"], paper["evidence_grade"] = classify_study_context(paper)
         papers.append(paper)
         if pmid and not item.get("abstractText") and index < len(items) - 1:
             time.sleep(0.12)
