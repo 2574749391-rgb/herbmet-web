@@ -272,7 +272,7 @@ def login_gate():
         """,
         unsafe_allow_html=True,
     )
-    login_tab, register_tab = st.tabs(("账号登录", "注册账号"))
+    login_tab, register_tab, reset_tab = st.tabs(("账号登录", "注册账号", "忘记密码"))
     with login_tab:
         with st.form("account_login_form"):
             identifier = st.text_input("账号或邮箱")
@@ -293,6 +293,22 @@ def login_gate():
             submitted = st.form_submit_button("注册", type="primary")
         if submitted:
             email_register(display_name, email, password, password_again)
+    with reset_tab:
+        st.caption("普通邮箱账号可通过一次性验证码重置密码；平台测试账号请联系站点管理员。")
+        with st.form("send_reset_code_form"):
+            reset_email = st.text_input("注册邮箱", key="password_reset_email")
+            send_code_submitted = st.form_submit_button("发送验证码")
+        if send_code_submitted:
+            send_password_reset_code(reset_email)
+        if st.session_state.get("reset_email"):
+            st.info(f"验证码已请求发送至：{st.session_state['reset_email']}")
+            with st.form("verify_reset_code_form"):
+                reset_code = st.text_input("邮箱验证码", placeholder="输入邮件中的验证码")
+                reset_new_password = st.text_input("新密码（至少 8 位）", type="password", key="reset_new_password")
+                reset_new_password_again = st.text_input("再次输入新密码", type="password", key="reset_new_password_again")
+                reset_submitted = st.form_submit_button("验证并重置密码", type="primary")
+            if reset_submitted:
+                reset_password_with_code(reset_code, reset_new_password, reset_new_password_again)
     st.caption("登录信息会以加密会话保存，刷新页面后仍可保持登录。")
     st.stop()
 
@@ -363,6 +379,57 @@ def change_email_password(current_password, new_password, new_password_again):
         st.success("密码修改成功，下次登录请使用新密码。")
     except Exception:
         st.error("当前密码不正确，或密码修改暂时失败。")
+
+
+def send_password_reset_code(email):
+    email = email.strip().lower()
+    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+        st.error("请输入正确的邮箱地址。")
+        return
+    try:
+        client = supabase_client()
+        client.auth.sign_in_with_otp({
+            "email": email,
+            "options": {"should_create_user": False},
+        })
+        st.session_state["reset_email"] = email
+        st.success("如果该邮箱已经注册，验证码将发送到邮箱。请检查收件箱和垃圾邮件。")
+    except Exception:
+        # 不暴露邮箱是否注册，避免被用来探测用户账号。
+        st.success("如果该邮箱已经注册，验证码将发送到邮箱。请检查收件箱和垃圾邮件。")
+
+
+def reset_password_with_code(code, new_password, new_password_again):
+    email = st.session_state.get("reset_email", "")
+    if not email:
+        st.error("请先发送邮箱验证码。")
+        return
+    if not code.strip():
+        st.error("请输入邮箱中的验证码。")
+        return
+    if len(new_password) < 8:
+        st.error("新密码至少需要 8 位。")
+        return
+    if new_password != new_password_again:
+        st.error("两次输入的新密码不一致。")
+        return
+    try:
+        client = supabase_client()
+        response = client.auth.verify_otp({
+            "email": email,
+            "token": code.strip(),
+            "type": "email",
+        })
+        if not response.session:
+            raise ValueError("验证码未建立有效会话")
+        client.auth.update_user({"password": new_password})
+        establish_login(client, response, "byok")
+        st.session_state.pop("reset_email", None)
+        st.success("密码重置成功，正在进入系统。")
+        time.sleep(0.8)
+        st.rerun()
+    except Exception:
+        st.error("验证码无效或已过期，请重新获取后再试。")
 
 
 def show_model_error(error):
