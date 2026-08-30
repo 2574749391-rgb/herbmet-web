@@ -367,6 +367,19 @@ def generate_report(
     return response.choices[0].message.content
 
 
+def answer_report_question(report, question, api_key, base_url, model):
+    """只根据当前报告回答追问，避免把模型常识伪装成已检索证据。"""
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": """你是 HerbMet 报告问答助手。只能依据用户提供的当前报告回答，不得补充报告外的论文、数据、PMID 或 DOI。报告没有答案时，必须明确说“当前报告证据不足，建议回查论文全文或重新检索”。使用中文，先给简短结论，再说明依据和不确定性。不提供诊断、处方或用药建议。"""},
+            {"role": "user", "content": f"当前报告：\n\n{report}\n\n用户问题：{question}"},
+        ],
+    )
+    return response.choices[0].message.content
+
+
 def main():
     load_dotenv()
     api_key = os.getenv("CHANGSHA_API_KEY")

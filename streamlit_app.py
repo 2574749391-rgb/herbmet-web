@@ -16,6 +16,7 @@ from supabase import create_client
 
 from main import (
     HERB_PROFILES,
+    answer_report_question,
     collect_adme,
     collect_overview,
     discover_constituents,
@@ -391,17 +392,78 @@ def display_evidence_overview(papers, herb, download_key):
     )
 
 
-def display_report(report, herb, papers=None, download_key="report"):
+def split_report_sections(report):
+    """按报告中的编号标题拆页；旧报告格式无法识别时保留完整显示。"""
+    pattern = re.compile(r"(?m)^(?:#{1,4}\s*)?(?:\*\*)?([1-9])(?:[.、])\s+.+$")
+    matches = list(pattern.finditer(report))
+    if len(matches) < 2:
+        return [("完整报告", report)]
+    sections = []
+    for index, match in enumerate(matches):
+        start = 0 if index == 0 else match.start()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(report)
+        content = report[start:end].strip()
+        title_line = match.group(0)
+        title = re.sub(r"[#*]", "", title_line).strip()
+        sections.append((title[:36], content))
+    return sections
+
+
+@st.dialog("报告问答助手", width="large")
+def report_qa_dialog(report, herb, api_key, base_url, model, state_key):
+    st.warning("回答仅根据当前自动生成的报告整理，可能遗漏或误解信息。重要结论请核对 PMID、DOI 和论文全文；不得用于诊断或用药决策。")
+    history_key = f"qa-history-{state_key}"
+    history = st.session_state.setdefault(history_key, [])
+    for item in history[-6:]:
+        with st.chat_message("user"):
+            st.markdown(item["question"])
+        with st.chat_message("assistant"):
+            st.markdown(item["answer"])
+    with st.form(f"qa-form-{state_key}"):
+        question = st.text_input("围绕当前报告提问", placeholder=f"例如：{herb}目前有人体药代动力学证据吗？")
+        ask = st.form_submit_button("发送问题", type="primary")
+    if ask:
+        if not question.strip():
+            st.warning("请先输入问题。")
+        elif not api_key or not base_url or not model:
+            st.error("问答助手需要模型 API Key。请先在左侧模型设置中填写。")
+        else:
+            try:
+                with st.spinner("正在核对当前报告…"):
+                    answer = answer_report_question(report, question.strip(), api_key, base_url, model)
+                history.append({"question": question.strip(), "answer": answer})
+                with st.chat_message("assistant"):
+                    st.markdown(answer)
+            except Exception as error:
+                show_model_error(error)
+
+
+def display_report(report, herb, papers=None, download_key="report", api_key="", base_url="", model=""):
     if papers:
         display_evidence_overview(papers, herb, download_key)
         with st.expander("查看入选文献与相关性", expanded=False):
             display_papers(papers)
     st.header("文献分析报告")
-    st.markdown(report)
+    sections = split_report_sections(report)
+    if len(sections) > 1:
+        st.caption(f"报告共 {len(sections)} 页，可按章节阅读，减少长页面滚动。")
+        section_labels = [title for title, _ in sections]
+        selected_section = st.selectbox("报告分页", section_labels, key=f"section-{download_key}")
+        section_content = dict(sections)[selected_section]
+        with st.container(border=True):
+            st.markdown(section_content)
+    else:
+        with st.container(border=True):
+            st.markdown(report)
     warnings = terminology_warnings(report)
     if warnings:
         st.warning("术语检查发现潜在冲突：\n\n- " + "\n- ".join(warnings))
-    st.download_button("下载 Markdown 报告", data=report, file_name=f"HerbMet-{herb}-report.md", mime="text/markdown", key=download_key)
+    action1, action2 = st.columns(2)
+    with action1:
+        st.download_button("下载完整 Markdown 报告", data=report, file_name=f"HerbMet-{herb}-report.md", mime="text/markdown", key=download_key, use_container_width=True)
+    with action2:
+        if st.button("打开报告问答助手", key=f"qa-open-{download_key}", use_container_width=True):
+            report_qa_dialog(report, herb, api_key, base_url, model, download_key)
 
 
 def save_study(herb, scientific_name, overview_papers, adme_papers, model, report):
@@ -738,7 +800,7 @@ with analysis_tab:
                 st.success("分析完成，已保存到您的云端历史记录。")
             except Exception as error:
                 st.warning(f"报告已生成，但云端保存失败：{error}")
-            display_report(report, stage1["herb"], [*stage1["overview"], *adme_papers], "latest-report")
+            display_report(report, stage1["herb"], [*stage1["overview"], *adme_papers], "latest-report", api_key, base_url, model)
 
 with history_tab:
     st.header("我的历史记录")
@@ -766,7 +828,7 @@ with history_tab:
         c1.metric("药材", selected["herb_name"])
         c2.metric("ADME 证据", selected["adme_count"])
         c3.metric("模型", selected.get("model_name") or "未知")
-        display_report(selected["report"], selected["herb_name"], selected.get("papers") or [], f"history-{selected['id']}")
+        display_report(selected["report"], selected["herb_name"], selected.get("papers") or [], f"history-{selected['id']}", api_key, base_url, model)
     elif 'history_query' in st.session_state and st.session_state["history_query"]:
         st.info("没有找到匹配的历史记录，请更换关键词。")
 
