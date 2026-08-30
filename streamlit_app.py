@@ -454,14 +454,49 @@ def login_gate():
     st.stop()
 
 
+RELEVANCE_REASON_NAMES = {
+    "pharmacokinetics": "药代动力学关键词",
+    "metabolite": "代谢物关键词",
+    "absorption": "吸收关键词",
+    "distribution": "分布关键词",
+    "metabolism": "代谢关键词",
+    "biotransformation": "生物转化关键词",
+    "excretion": "排泄关键词",
+    "bioavailability": "生物利用度关键词",
+    "plasma": "血浆关键词",
+    "urine": "尿液关键词",
+}
+
+
+def relevance_band(score):
+    if score >= 70:
+        return "高度相关"
+    if score >= 50:
+        return "较相关"
+    return "初步相关"
+
+
+def display_relevance_guide():
+    with st.popover("如何理解“检索相关性”？"):
+        st.markdown(
+            "检索相关性是 **0–100 分的关键词初筛指标**，用于判断标题和摘要与本次 ADME 问题的接近程度。"
+            "目标名称、药代动力学、吸收、代谢、排泄、生物利用度及直接 ADME 指标会加分；综述或明显偏离研究目标的内容会扣分。"
+        )
+        st.warning("该分数不是论文质量、可信度或临床证据强度评分。重要结论仍需核对研究设计、全文、PMID 和 DOI。")
+
+
 def display_papers(papers):
     for index, paper in enumerate(papers, start=1):
+        score = paper.get("relevance_score", 0)
         st.markdown(f"**{index}. {paper['title']}**")
         st.caption(
             f"目标：{paper.get('research_target', '未知')} ｜ {paper['evidence_type']} ｜ "
             f"{paper.get('study_context', '研究场景未明确')} ｜ 等级 {paper.get('evidence_grade', 'D')} ｜ "
-            f"相关性：{paper['relevance_score']}/100"
+            f"检索相关性：{score}/100（{relevance_band(score)}）"
         )
+        reasons = [RELEVANCE_REASON_NAMES.get(item, item) for item in paper.get("relevance_reasons", [])]
+        if reasons:
+            st.caption("评分依据：" + "、".join(reasons))
         identifiers = []
         if paper.get("pmid"):
             identifiers.append(f"[PMID {paper['pmid']}](https://pubmed.ncbi.nlm.nih.gov/{paper['pmid']}/)")
@@ -480,7 +515,7 @@ def display_screening_audit(excluded_papers, title="查看未纳入文献与原�
             st.markdown(f"**{index}. {paper['title']}**")
             st.caption(
                 f"排除原因：{paper.get('exclusion_reason', '未达到筛选标准')} ｜ "
-                f"相关性：{paper.get('relevance_score', 0)}/100 ｜ "
+                f"检索相关性：{paper.get('relevance_score', 0)}/100（{relevance_band(paper.get('relevance_score', 0))}） ｜ "
                 f"{paper.get('study_context', '研究场景未明确')}"
             )
 
@@ -488,7 +523,7 @@ def display_screening_audit(excluded_papers, title="查看未纳入文献与原�
 def papers_to_csv(papers):
     """把入选文献整理为便于 Excel 打开的 UTF-8 CSV。"""
     output = io.StringIO()
-    fields = ("研究目标", "标题", "作者", "年份", "研究场景", "证据等级", "证据类型", "相关性", "PMID", "DOI")
+    fields = ("研究目标", "标题", "作者", "年份", "研究场景", "证据等级", "证据类型", "检索相关性", "PMID", "DOI")
     writer = csv.DictWriter(output, fieldnames=fields)
     writer.writeheader()
     for paper in papers:
@@ -500,7 +535,7 @@ def papers_to_csv(papers):
             "研究场景": paper.get("study_context", "研究场景未明确"),
             "证据等级": paper.get("evidence_grade", "D"),
             "证据类型": paper.get("evidence_type", ""),
-            "相关性": paper.get("relevance_score", 0),
+            "检索相关性": paper.get("relevance_score", 0),
             "PMID": paper.get("pmid", ""),
             "DOI": paper.get("doi", ""),
         })
@@ -578,7 +613,8 @@ def report_qa_dialog(report, herb, api_key, base_url, model, state_key):
 def display_report(report, herb, papers=None, download_key="report", api_key="", base_url="", model=""):
     if papers:
         display_evidence_overview(papers, herb, download_key)
-        with st.expander("查看入选文献与相关性", expanded=False):
+        with st.expander("查看入选文献与检索相关性", expanded=False):
+            display_relevance_guide()
             display_papers(papers)
     st.header("文献分析报告")
     sections = split_report_sections(report)
@@ -889,6 +925,7 @@ with analysis_tab:
         if stage1["overview"]:
             with st.expander("查看第一阶段入选文献", expanded=False):
                 st.caption("这些文献用于认识药材整体成分，不等同于具体成分的直接 ADME 证据。")
+                display_relevance_guide()
                 display_papers(stage1["overview"])
         display_screening_audit(stage1.get("overview_excluded", []), "查看第一阶段未纳入文献与原因")
         st.caption("下面的成分来自药材目录与第一阶段文献摘要。括号内为中文名或常用名，系统仍使用括号前的英文名检索文献。")
