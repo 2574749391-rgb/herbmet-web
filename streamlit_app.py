@@ -640,6 +640,17 @@ def display_report(report, herb, papers=None, download_key="report", api_key="",
             report_qa_dialog(report, herb, api_key, base_url, model, download_key)
 
 
+def detect_research_intent(question):
+    research_terms = ("文献", "证据", "pmid", "doi", "药代", "药动", "吸收", "分布", "代谢", "排泄", "生物利用度", "半衰期", "cmax", "tmax")
+    lowered = question.lower()
+    if not any(term in lowered for term in research_terms):
+        return ""
+    for herb_name, profile in HERB_PROFILES.items():
+        if herb_name in question or profile.get("scientific_name", "").lower() in lowered:
+            return herb_name
+    return ""
+
+
 def display_agent_chat(api_key, base_url, model):
     st.markdown(
         """<div class="catalog-card"><b>HerbMet 智能问答</b><br>
@@ -653,6 +664,24 @@ def display_agent_chat(api_key, base_url, model):
     for item in chat_history:
         with st.chat_message(item["role"]):
             st.markdown(item["content"])
+    completed_herb = st.session_state.pop("agent_research_completed", "")
+    if completed_herb:
+        st.success(f"{completed_herb} 的第一阶段检索已完成。请点击上方“两阶段研究”，核查入选文献并确认候选成分。")
+    suggestion = st.session_state.get("agent_research_suggestion")
+    if suggestion:
+        with st.container(border=True):
+            st.markdown(f"**检测到证据型问题：{suggestion}**")
+            st.caption("快速问答不能替代实时文献检索。可以让智能体先执行第一阶段，检索药材成分概览并筛选候选成分。")
+            start_col, dismiss_col = st.columns((3, 1))
+            with start_col:
+                if st.button(f"开始检索 {suggestion}", type="primary", use_container_width=True, key="agent_start_research"):
+                    st.session_state["auto_research_herb"] = suggestion
+                    st.session_state["analysis_prefill"] = suggestion
+                    st.rerun()
+            with dismiss_col:
+                if st.button("暂不检索", use_container_width=True, key="agent_dismiss_research"):
+                    st.session_state.pop("agent_research_suggestion", None)
+                    st.rerun()
     with st.form("general_agent_form", clear_on_submit=True):
         question = st.text_area("向 HerbMet 提问", placeholder="输入关于中药材、化学成分、ADME 或研究方法的问题……", height=90)
         ask_col, clear_col = st.columns((4, 1))
@@ -676,6 +705,9 @@ def display_agent_chat(api_key, base_url, model):
                     {"role": "user", "content": question.strip()},
                     {"role": "assistant", "content": answer},
                 ))
+                research_herb = detect_research_intent(question.strip())
+                if research_herb:
+                    st.session_state["agent_research_suggestion"] = research_herb
                 st.rerun()
             except Exception as error:
                 show_model_error(error)
@@ -866,6 +898,7 @@ with agent_tab:
     display_agent_chat(api_key.strip(), base_url.strip(), model.strip())
 
 with analysis_tab:
+    auto_research_herb = st.session_state.pop("auto_research_herb", "")
     catalog_categories = {herb_category(name, profile) for name, profile in HERB_PROFILES.items()}
     categories = ["全部", *[name for name in CATEGORY_FALLBACK if name in catalog_categories]]
     categories.extend(sorted(catalog_categories - set(categories)))
@@ -896,14 +929,15 @@ with analysis_tab:
     with st.form("analysis_form"):
         manual_herb = st.text_input(
             "或直接输入中药材名称",
+            value=st.session_state.get("analysis_prefill", ""),
             placeholder="例如：黄芪",
             help="手动输入优先于上方的快速选择，也可以输入尚未收录的药材或英文学名。",
         )
         submitted = st.form_submit_button("第一阶段：发现候选成分", type="primary")
-    if submitted:
+    if submitted or auto_research_herb:
         st.session_state.pop("latest_report_result", None)
         st.session_state.pop("qa-history-latest-report", None)
-        herb = manual_herb.strip() or popular_herb or (quick_herb if quick_herb != "手动输入" else "")
+        herb = auto_research_herb or manual_herb.strip() or popular_herb or (quick_herb if quick_herb != "手动输入" else "")
         herb, api_key, base_url, model = herb.strip(), api_key.strip(), base_url.strip(), model.strip()
         if not herb:
             st.warning("请输入中药材名称。")
@@ -949,6 +983,10 @@ with analysis_tab:
             "mode": discovery_mode,
             "extraction_warning": extraction_warning,
         }
+        if auto_research_herb:
+            st.session_state["agent_research_completed"] = herb
+            st.session_state.pop("agent_research_suggestion", None)
+            st.rerun()
 
     stage1 = st.session_state.get("stage1_result")
     if stage1:
