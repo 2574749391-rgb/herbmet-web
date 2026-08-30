@@ -340,6 +340,31 @@ def load_studies():
     return response.data or []
 
 
+def change_email_password(current_password, new_password, new_password_again):
+    if len(new_password) < 8:
+        st.error("新密码至少需要 8 位。")
+        return
+    if new_password != new_password_again:
+        st.error("两次输入的新密码不一致。")
+        return
+    if current_password == new_password:
+        st.error("新密码不能与当前密码相同。")
+        return
+    try:
+        client = supabase_client()
+        response = client.auth.sign_in_with_password({
+            "email": st.session_state["username"],
+            "password": current_password,
+        })
+        client.auth.update_user({"password": new_password})
+        st.session_state["sb_client"] = client
+        if response.session:
+            save_login_cookie(response.session, "byok")
+        st.success("密码修改成功，下次登录请使用新密码。")
+    except Exception:
+        st.error("当前密码不正确，或密码修改暂时失败。")
+
+
 def show_model_error(error):
     if isinstance(error, AuthenticationError):
         st.error("API Key 无效，或它与当前服务商不匹配。")
@@ -399,6 +424,18 @@ with st.sidebar:
         base_url = st.text_input("Base URL", value="https://dashscope.aliyuncs.com/compatible-mode/v1" if provider == "阿里云百炼" else "")
         model = st.text_input("模型名称", value="qwen-plus" if provider == "阿里云百炼" else "")
         api_key = st.text_input("API Key", type="password", placeholder="仅用于当前会话")
+    st.divider()
+    with st.expander("账号安全"):
+        if platform_account:
+            st.caption("平台账号密码由站点管理员在 Streamlit Secrets 的 [auth] 配置中修改。")
+        else:
+            with st.form("change_password_form"):
+                current_password = st.text_input("当前密码", type="password")
+                new_password = st.text_input("新密码（至少 8 位）", type="password")
+                new_password_again = st.text_input("再次输入新密码", type="password")
+                change_submitted = st.form_submit_button("修改密码", use_container_width=True)
+            if change_submitted:
+                change_email_password(current_password, new_password, new_password_again)
 
 if api_key.strip():
     st.success("当前模式：有 Key 增强模式 · 自动提取候选成分，并可完成 ADME 报告")
