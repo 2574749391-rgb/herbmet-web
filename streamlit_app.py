@@ -589,12 +589,20 @@ with analysis_tab:
                 status.write(f"成分概览文献：{len(overview_papers)} 篇")
                 if api_key:
                     status.write("增强模式：正在从摘要中识别候选成分…")
-                    candidates = discover_constituents(profile, overview_papers, api_key, base_url, model)
-                    discovery_mode = "有 Key增强模式"
+                    try:
+                        candidates = discover_constituents(profile, overview_papers, api_key, base_url, model)
+                        discovery_mode = "有 Key增强模式"
+                        extraction_warning = ""
+                    except Exception:
+                        candidates = list(profile.get("constituents") or [])
+                        discovery_mode = "增强模式提取失败，已使用目录预设成分"
+                        extraction_warning = "模型暂时无法自动提取新成分，本次已退回药材目录中的预设成分；文献检索结果不受影响。"
+                        status.write("自动提取暂时失败，已安全退回目录预设成分。")
                 else:
                     status.write("基础模式：读取药材目录中的预设成分，不调用模型。")
                     candidates = list(profile.get("constituents") or [])
                     discovery_mode = "无 Key基础模式"
+                    extraction_warning = ""
                 status.update(label="第一阶段完成，请确认候选成分", state="complete")
         except RuntimeError as error:
             st.error(str(error))
@@ -609,11 +617,14 @@ with analysis_tab:
             "overview_excluded": overview_excluded,
             "candidates": candidates,
             "mode": discovery_mode,
+            "extraction_warning": extraction_warning,
         }
 
     stage1 = st.session_state.get("stage1_result")
     if stage1:
         st.success(f"第一阶段完成：{stage1['herb']}（{stage1['profile']['scientific_name']}） · {stage1.get('mode', '基础模式')}")
+        if stage1.get("extraction_warning"):
+            st.warning(stage1["extraction_warning"])
         display_screening_audit(stage1.get("overview_excluded", []), "查看第一阶段未纳入文献与原因")
         st.caption("下面的成分来自药材目录与第一阶段文献摘要。请取消不需要的成分，也可以补充一个英文成分名。")
         if not stage1["candidates"]:
