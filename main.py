@@ -380,6 +380,26 @@ def answer_report_question(report, question, api_key, base_url, model):
     return response.choices[0].message.content
 
 
+def answer_general_question(question, history, api_key, base_url, model):
+    """首页智能体对话；明确标识未经过实时文献检索。"""
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    messages = [{"role": "system", "content": """你是 HerbMet 中药材代谢研究智能体。你可以解释中药材、化学成分、药代动力学、吸收、分布、代谢、排泄和文献研究方法。
+
+当前是“快速问答模式”，没有执行实时文献检索。因此：
+1. 不得声称回答已经检索数据库或核对论文全文。
+2. 不得编造 PMID、DOI、论文、实验数值或确定性结论。
+3. 涉及具体证据时，提醒用户使用“两阶段研究”功能检索并核查原文。
+4. 不提供诊断、处方、剂量、配伍或个体化用药建议。
+5. 使用中文，表达清楚、简洁；区分已知概念、合理推测和不确定信息。
+6. 若用户要求临床决策，说明本平台仅用于科研与学习，并建议咨询合格专业人员。"""}]
+    for item in history[-8:]:
+        if item.get("role") in ("user", "assistant") and item.get("content"):
+            messages.append({"role": item["role"], "content": item["content"]})
+    messages.append({"role": "user", "content": question})
+    response = client.chat.completions.create(model=model, messages=messages)
+    return response.choices[0].message.content
+
+
 def main():
     load_dotenv()
     api_key = os.getenv("CHANGSHA_API_KEY")

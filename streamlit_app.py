@@ -16,6 +16,7 @@ from supabase import create_client
 
 from main import (
     HERB_PROFILES,
+    answer_general_question,
     answer_report_question,
     collect_adme,
     collect_overview,
@@ -639,6 +640,47 @@ def display_report(report, herb, papers=None, download_key="report", api_key="",
             report_qa_dialog(report, herb, api_key, base_url, model, download_key)
 
 
+def display_agent_chat(api_key, base_url, model):
+    st.markdown(
+        """<div class="catalog-card"><b>HerbMet 智能问答</b><br>
+        <span style="color:#7a6858">无需先做两阶段检索，可以直接咨询中药材成分、代谢概念和研究方法。</span></div>""",
+        unsafe_allow_html=True,
+    )
+    st.info("当前为快速问答模式：回答来自模型的一般知识，尚未实时检索文献。需要 PMID、DOI 或证据报告时，请使用“两阶段研究”。")
+    chat_history = st.session_state.setdefault("general_agent_history", [])
+    if not chat_history:
+        st.markdown("**你可以这样问：**　黄芪甲苷 IV 是什么？　｜　如何理解首过代谢？　｜　动物药代研究能否外推到人体？")
+    for item in chat_history:
+        with st.chat_message(item["role"]):
+            st.markdown(item["content"])
+    with st.form("general_agent_form", clear_on_submit=True):
+        question = st.text_area("向 HerbMet 提问", placeholder="输入关于中药材、化学成分、ADME 或研究方法的问题……", height=90)
+        ask_col, clear_col = st.columns((4, 1))
+        with ask_col:
+            submitted = st.form_submit_button("发送给智能体", type="primary", use_container_width=True)
+        with clear_col:
+            clear_chat = st.form_submit_button("清空对话", use_container_width=True)
+    if clear_chat:
+        st.session_state["general_agent_history"] = []
+        st.rerun()
+    if submitted:
+        if not question.strip():
+            st.warning("请先输入问题。")
+        elif not api_key or not base_url or not model:
+            st.error("智能问答需要模型 API Key。请先在左侧模型设置中填写。")
+        else:
+            try:
+                with st.spinner("HerbMet 正在思考…"):
+                    answer = answer_general_question(question.strip(), chat_history, api_key, base_url, model)
+                chat_history.extend((
+                    {"role": "user", "content": question.strip()},
+                    {"role": "assistant", "content": answer},
+                ))
+                st.rerun()
+            except Exception as error:
+                show_model_error(error)
+
+
 def save_study(herb, scientific_name, overview_papers, adme_papers, model, report):
     st.session_state["sb_client"].table("studies").insert({
         "user_id": st.session_state["user_id"],
@@ -819,7 +861,10 @@ with st.expander("无 Key与有 Key有什么区别？", expanded=False):
         st.markdown("**有 Key增强模式**")
         st.markdown("- 包含基础模式全部功能\n- 从文献摘要自动提取新成分\n- 可继续检索 ADME 并生成报告\n- 提取和报告生成会消耗 Token")
 
-analysis_tab, history_tab = st.tabs(("新建分析", "我的历史记录"))
+agent_tab, analysis_tab, history_tab = st.tabs(("智能问答", "两阶段研究", "我的历史记录"))
+with agent_tab:
+    display_agent_chat(api_key.strip(), base_url.strip(), model.strip())
+
 with analysis_tab:
     catalog_categories = {herb_category(name, profile) for name, profile in HERB_PROFILES.items()}
     categories = ["全部", *[name for name in CATEGORY_FALLBACK if name in catalog_categories]]
