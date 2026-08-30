@@ -683,6 +683,8 @@ with analysis_tab:
         )
         submitted = st.form_submit_button("第一阶段：发现候选成分", type="primary")
     if submitted:
+        st.session_state.pop("latest_report_result", None)
+        st.session_state.pop("qa-history-latest-report", None)
         herb = manual_herb.strip() or popular_herb or (quick_herb if quick_herb != "手动输入" else "")
         herb, api_key, base_url, model = herb.strip(), api_key.strip(), base_url.strip(), model.strip()
         if not herb:
@@ -738,6 +740,8 @@ with analysis_tab:
         with restart_col:
             if st.button("重新开始", use_container_width=True, key="restart_analysis"):
                 st.session_state.pop("stage1_result", None)
+                st.session_state.pop("latest_report_result", None)
+                st.session_state.pop("qa-history-latest-report", None)
                 st.rerun()
         if stage1.get("extraction_warning"):
             st.warning(stage1["extraction_warning"])
@@ -784,11 +788,6 @@ with analysis_tab:
                 st.stop()
             report_profile = dict(stage1["profile"])
             report_profile["constituents"] = targets
-            col1, col2, col3 = st.columns(3)
-            col1.metric("候选成分", len(targets))
-            col2.metric("成分概览文献", len(stage1["overview"]))
-            col3.metric("ADME / 生物转化证据", len(adme_papers))
-            display_screening_audit(adme_excluded, "查看第二阶段未纳入文献与原因")
             try:
                 with st.spinner("正在基于入选证据生成结构化报告…"):
                     report = generate_report(stage1["herb"], report_profile, stage1["overview"], adme_papers, api_key, base_url=base_url, model=model)
@@ -800,7 +799,27 @@ with analysis_tab:
                 st.success("分析完成，已保存到您的云端历史记录。")
             except Exception as error:
                 st.warning(f"报告已生成，但云端保存失败：{error}")
-            display_report(report, stage1["herb"], [*stage1["overview"], *adme_papers], "latest-report", api_key, base_url, model)
+            st.session_state["latest_report_result"] = {
+                "herb": stage1["herb"],
+                "report": report,
+                "papers": [*stage1["overview"], *adme_papers],
+                "targets": targets,
+                "overview_count": len(stage1["overview"]),
+                "adme_count": len(adme_papers),
+                "adme_excluded": adme_excluded,
+            }
+
+        latest = st.session_state.get("latest_report_result")
+        if latest and latest.get("herb") == stage1["herb"]:
+            st.divider()
+            st.header("本次分析结果")
+            st.caption("报告和问答助手会保留在当前的新建分析页面；云端副本也可在“我的历史记录”中查看。")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("候选成分", len(latest["targets"]))
+            col2.metric("成分概览文献", latest["overview_count"])
+            col3.metric("ADME / 生物转化证据", latest["adme_count"])
+            display_screening_audit(latest.get("adme_excluded", []), "查看第二阶段未纳入文献与原因")
+            display_report(latest["report"], latest["herb"], latest["papers"], "latest-report", api_key, base_url, model)
 
 with history_tab:
     st.header("我的历史记录")
