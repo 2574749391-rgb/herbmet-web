@@ -262,8 +262,16 @@ def login_gate():
             if st.button("退出登录", use_container_width=True):
                 sign_out()
         return
-    st.title("🌿 HerbMet")
-    st.subheader("登录中药材代谢研究助手")
+    st.markdown(
+        """
+        <section class="herbmet-hero">
+          <div class="herbmet-eyebrow">HERBMET · 本草循证研究</div>
+          <div class="herbmet-title">🌿 中药材代谢研究助手</div>
+          <p class="herbmet-subtitle">登录后检索文献、生成报告，并在不同设备查看个人研究记录。</p>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
     login_tab, register_tab = st.tabs(("账号登录", "注册账号"))
     with login_tab:
         with st.form("account_login_form"):
@@ -415,6 +423,12 @@ with analysis_tab:
         f'<div class="catalog-card"><b>药材知识库</b><br><span style="color:#9fb0a7">已收录 {len(HERB_PROFILES)} 种常用药材，选择分类可快速定位，也可直接输入其他药材。</span></div>',
         unsafe_allow_html=True,
     )
+    popular_herb = st.pills(
+        "常用药材快捷入口",
+        ("黄芪", "人参", "甘草", "当归", "丹参", "生姜", "黄连", "三七"),
+        selection_mode="single",
+        key="popular_herb",
+    )
     picker_left, picker_right = st.columns((1, 1.35), gap="medium")
     with picker_left:
         category = st.selectbox("功效分类", categories, help="先选分类可以更快找到已收录的药材。")
@@ -437,7 +451,7 @@ with analysis_tab:
         )
         submitted = st.form_submit_button("第一阶段：发现候选成分", type="primary")
     if submitted:
-        herb = manual_herb.strip() or (quick_herb if quick_herb != "手动输入" else "")
+        herb = manual_herb.strip() or popular_herb or (quick_herb if quick_herb != "手动输入" else "")
         herb, api_key, base_url, model = herb.strip(), api_key.strip(), base_url.strip(), model.strip()
         if not herb:
             st.warning("请输入中药材名称。")
@@ -539,6 +553,15 @@ with history_tab:
     if not studies:
         st.info("还没有历史记录。完成一次分析后会显示在这里。")
     else:
+        history_query = st.text_input("搜索历史记录", placeholder="输入药材中文名或英文学名", key="history_query").strip().lower()
+        if history_query:
+            studies = [
+                study for study in studies
+                if history_query in str(study.get("herb_name", "")).lower()
+                or history_query in str(study.get("scientific_name", "")).lower()
+            ]
+        st.caption(f"找到 {len(studies)} 条记录")
+    if studies:
         labels = {f"{s['herb_name']} · {s['created_at'][:16].replace('T', ' ')}": s for s in studies}
         selected = labels[st.selectbox("选择报告", tuple(labels.keys()))]
         c1, c2, c3 = st.columns(3)
@@ -546,6 +569,8 @@ with history_tab:
         c2.metric("ADME 证据", selected["adme_count"])
         c3.metric("模型", selected.get("model_name") or "未知")
         display_report(selected["report"], selected["herb_name"], selected.get("papers") or [], f"history-{selected['id']}")
+    elif 'history_query' in st.session_state and st.session_state["history_query"]:
+        st.info("没有找到匹配的历史记录，请更换关键词。")
 
 st.divider()
 st.caption("仅用于科研与学习辅助，不用于临床诊疗。关键结论请回查 PMID、DOI 与论文全文。")
