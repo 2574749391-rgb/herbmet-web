@@ -670,9 +670,23 @@ with analysis_tab:
 
     stage1 = st.session_state.get("stage1_result")
     if stage1:
-        st.success(f"第一阶段完成：{stage1['herb']}（{stage1['profile']['scientific_name']}） · {stage1.get('mode', '基础模式')}")
+        result_title, restart_col = st.columns((5, 1))
+        with result_title:
+            st.success(f"第一阶段完成：{stage1['herb']}（{stage1['profile']['scientific_name']}） · {stage1.get('mode', '基础模式')}")
+        with restart_col:
+            if st.button("重新开始", use_container_width=True, key="restart_analysis"):
+                st.session_state.pop("stage1_result", None)
+                st.rerun()
         if stage1.get("extraction_warning"):
             st.warning(stage1["extraction_warning"])
+        summary1, summary2, summary3 = st.columns(3)
+        summary1.metric("入选概览文献", len(stage1["overview"]))
+        summary2.metric("未纳入文献", len(stage1.get("overview_excluded", [])))
+        summary3.metric("候选成分", len(stage1["candidates"]))
+        if stage1["overview"]:
+            with st.expander("查看第一阶段入选文献", expanded=False):
+                st.caption("这些文献用于认识药材整体成分，不等同于具体成分的直接 ADME 证据。")
+                display_papers(stage1["overview"])
         display_screening_audit(stage1.get("overview_excluded", []), "查看第一阶段未纳入文献与原因")
         st.caption("下面的成分来自药材目录与第一阶段文献摘要。请取消不需要的成分，也可以补充一个英文成分名。")
         if not stage1["candidates"]:
