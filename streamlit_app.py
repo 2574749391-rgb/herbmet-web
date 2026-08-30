@@ -26,6 +26,117 @@ from main import (
 )
 
 
+COMPOUND_CHINESE_NAMES = {
+    "1-Deoxynojirimycin": "1-脱氧野尻霉素",
+    "6-Gingerol": "6-姜酚",
+    "8-Gingerol": "8-姜酚",
+    "10-Gingerol": "10-姜酚",
+    "6-Shogaol": "6-姜烯酚",
+    "Aconitine": "乌头碱",
+    "Mesaconitine": "新乌头碱",
+    "Hypaconitine": "次乌头碱",
+    "Acteoside": "毛蕊花糖苷（麦角甾苷）",
+    "Allantoin": "尿囊素",
+    "Aloe-emodin": "芦荟大黄素",
+    "Amygdalin": "苦杏仁苷",
+    "Apigenin": "芹菜素",
+    "Astragaloside IV": "黄芪甲苷 IV（黄芪皂苷 IV）",
+    "Atractylenolide I": "白术内酯 I",
+    "Atractylenolide II": "白术内酯 II",
+    "Atractylenolide III": "白术内酯 III",
+    "Baicalein": "黄芩素",
+    "Baicalin": "黄芩苷",
+    "Benzaldehyde": "苯甲醛",
+    "Berberine": "小檗碱（黄连素）",
+    "Beta-eudesmol": "β-桉叶醇",
+    "Betaine": "甜菜碱",
+    "Bilobalide": "白果内酯",
+    "Calcium sulfate dihydrate": "二水硫酸钙",
+    "Calycosin": "毛蕊异黄酮",
+    "Catalpol": "梓醇",
+    "Chlorogenic acid": "绿原酸",
+    "Cinnamaldehyde": "肉桂醛",
+    "Cinnamic acid": "肉桂酸",
+    "Coptisine": "黄连碱",
+    "Coumarin": "香豆素",
+    "Crocin": "西红花苷（藏红花素）",
+    "Cryptotanshinone": "隐丹参酮",
+    "Cycloastragenol": "环黄芪醇",
+    "Daidzein": "大豆苷元",
+    "Daidzin": "大豆苷",
+    "Diosgenin": "薯蓣皂苷元",
+    "Emodin": "大黄素",
+    "Ephedrine": "麻黄碱",
+    "Epigoitrin": "表告依春",
+    "Epimedin C": "朝藿定 C",
+    "Ferulic acid": "阿魏酸",
+    "Forsythiaside A": "连翘酯苷 A",
+    "Genipin": "京尼平",
+    "Geniposide": "栀子苷",
+    "Ginkgolide A": "银杏内酯 A",
+    "Ginkgolide B": "银杏内酯 B",
+    "Ginsenoside Rb1": "人参皂苷 Rb1",
+    "Ginsenoside Rd": "人参皂苷 Rd",
+    "Ginsenoside Rg1": "人参皂苷 Rg1",
+    "Glycyrrhetinic acid": "甘草次酸",
+    "Glycyrrhizin": "甘草酸（甘草甜素）",
+    "Hesperidin": "橙皮苷",
+    "Hydroxysafflor yellow A": "羟基红花黄色素 A",
+    "Icariin": "淫羊藿苷",
+    "Icaritin": "淫羊藿素",
+    "Imperatorin": "欧前胡素",
+    "Indigo": "靛蓝",
+    "Indirubin": "靛玉红",
+    "Isoimperatorin": "异欧前胡素",
+    "Jujuboside A": "酸枣仁皂苷 A",
+    "Kaempferol": "山柰酚",
+    "Liquiritigenin": "甘草素",
+    "Loganin": "马钱苷",
+    "Luteolin": "木犀草素",
+    "Mangiferin": "芒果苷",
+    "Menthol": "薄荷醇（薄荷脑）",
+    "Menthone": "薄荷酮",
+    "Methylephedrine": "甲基麻黄碱",
+    "Naringin": "柚皮苷",
+    "Neohesperidin": "新橙皮苷",
+    "Nobiletin": "川陈皮素",
+    "Notoginsenoside R1": "三七皂苷 R1",
+    "Oleic acid": "油酸",
+    "Pachymic acid": "茯苓酸",
+    "Palmatine": "巴马汀（掌叶防己碱）",
+    "Perillaldehyde": "紫苏醛",
+    "Phillygenin": "连翘脂素",
+    "Phillyrin": "连翘苷",
+    "Pseudoephedrine": "伪麻黄碱",
+    "Puerarin": "葛根素",
+    "Quercetin": "槲皮素",
+    "Rhein": "大黄酸",
+    "Rosmarinic acid": "迷迭香酸",
+    "Rutin": "芦丁",
+    "Saikosaponin A": "柴胡皂苷 A",
+    "Saikosaponin C": "柴胡皂苷 C",
+    "Saikosaponin D": "柴胡皂苷 D",
+    "Salvianolic acid B": "丹酚酸 B",
+    "Scopoletin": "东莨菪内酯",
+    "Senkyunolide A": "洋川芎内酯 A",
+    "Spinosin": "斯皮诺素（棘苷）",
+    "Synephrine": "辛弗林（对羟福林）",
+    "Tangeretin": "橘皮素",
+    "Tanshinone IIA": "丹参酮 IIA",
+    "Timosaponin AIII": "知母皂苷 AIII",
+    "Timosaponin BII": "知母皂苷 BII",
+    "Wogonin": "汉黄芩素",
+    "Z-ligustilide": "Z-藁本内酯",
+    "Zeaxanthin": "玉米黄质",
+    "Zingerone": "姜酮（姜油酮）",
+}
+
+
+def compound_display_name(name):
+    chinese_name = COMPOUND_CHINESE_NAMES.get(name, "暂无常用中文名")
+    return f"{name}（{chinese_name}）"
+
+
 st.set_page_config(page_title="HerbMet · 中药材代谢研究助手", page_icon="🌿", layout="wide")
 
 st.markdown(
@@ -673,7 +784,7 @@ with analysis_tab:
         quick_herb = st.selectbox("快速选择药材", ["手动输入", *herb_options])
     if quick_herb != "手动输入":
         selected_profile = HERB_PROFILES[quick_herb]
-        components = "、".join(selected_profile.get("constituents", [])[:4]) or "检索后识别"
+        components = "、".join(compound_display_name(item) for item in selected_profile.get("constituents", [])[:4]) or "检索后识别"
         st.caption(f"已选择：{quick_herb} · {selected_profile.get('scientific_name', '')}　｜　代表性成分：{components}")
     with st.form("analysis_form"):
         manual_herb = st.text_input(
@@ -761,6 +872,7 @@ with analysis_tab:
             "候选成分（建议选择 1–5 个）",
             stage1["candidates"],
             default=stage1["candidates"][:5],
+            format_func=compound_display_name,
         )
         extra_target = st.text_input("补充成分英文名（可选）", placeholder="例如：Astragaloside II")
         if st.button("第二阶段：检索 ADME 并生成报告", type="primary"):
@@ -776,7 +888,7 @@ with analysis_tab:
                 st.stop()
             with st.status("第二阶段：正在逐个检索 ADME 证据…", expanded=True) as status:
                 for target in targets:
-                    status.write(f"正在检索：{target}")
+                    status.write(f"正在检索：{compound_display_name(target)}")
                 try:
                     adme_papers, adme_excluded = collect_adme(targets, return_audit=True)
                 except RuntimeError as error:
